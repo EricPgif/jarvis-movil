@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="manifest" href="manifest.json?v=9" />
+<link rel="manifest" href="manifest.json?v=10" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 <style>
   :root{
@@ -61,8 +61,9 @@
   .dock::-webkit-scrollbar{display:none;}
   .qbtn{flex:0 0 auto; width:60px; display:flex; flex-direction:column; align-items:center; gap:5px; background:transparent; border:0; color:var(--text-dim);}
   .qbtn .qi{width:48px; height:48px; border-radius:14px; border:1px solid var(--border); background:var(--card);
-    display:flex; align-items:center; justify-content:center; font-size:21px; color:var(--cyan);}
-  .qbtn:active .qi{background:var(--cyan-soft); border-color:var(--cyan);}
+    display:flex; align-items:center; justify-content:center; font-size:21px; color:var(--cyan);
+    transition:transform .12s cubic-bezier(.2,.7,.2,1), background .12s ease, border-color .12s ease, box-shadow .12s ease;}
+  .qbtn:active .qi{background:var(--cyan-soft); border-color:var(--cyan); transform:scale(.9); box-shadow:0 0 12px var(--cyan-glow);}
   .qbtn .ql{font-size:10px; letter-spacing:.3px;}
 
   /* ── Chat ── */
@@ -76,8 +77,8 @@
   .bar{display:flex; gap:8px; padding:10px 12px; padding-bottom:calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); background:rgba(7,17,29,.6);}
   .bar input[type=text]{flex:1; min-width:0; padding:12px 14px; font-size:16px; border-radius:12px; background:var(--bg); border:1px solid var(--border); color:var(--text); outline:none;}
   .bar input[type=text]:focus{border-color:var(--cyan);}
-  .ico-btn{width:48px; height:48px; border-radius:12px; border:1px solid var(--border); background:var(--cyan-soft); color:var(--cyan); font-size:19px; flex:0 0 auto;}
-  .ico-btn:active{background:var(--cyan-glow);}
+  .ico-btn{width:48px; height:48px; border-radius:12px; border:1px solid var(--border); background:var(--cyan-soft); color:var(--cyan); font-size:19px; flex:0 0 auto; transition:transform .12s cubic-bezier(.2,.7,.2,1), background .12s ease;}
+  .ico-btn:active{background:var(--cyan-glow); transform:scale(.93);}
   .ico-btn.mic.on{background:var(--green); color:#022; border-color:var(--green); box-shadow:0 0 14px rgba(0,255,136,.5);}
 
   /* estado del cuerpo (esfera reactiva) — bordes */
@@ -226,19 +227,19 @@
     </div>
   </div>
 
-  <script src="sfx.js?v=9"></script>
-  <script src="sphere.js?v=9"></script>
-  <script src="api.js?v=9"></script>
-  <script src="edgetts.js?v=9"></script>
-  <script src="voice.js?v=9"></script>
-  <script src="deeplinks.js?v=9"></script>
-  <script src="weather.js?v=9"></script>
-  <script src="router.js?v=9"></script>
-  <script src="super.js?v=9"></script>
-  <script src="intro.js?v=9"></script>
-  <script src="clap.js?v=9"></script>
-  <script src="standby.js?v=9"></script>
-  <script src="extras.js?v=9"></script>
-  <script src="movil.js?v=9"></script>
+  <script src="sfx.js?v=10"></script>
+  <script src="sphere.js?v=10"></script>
+  <script src="api.js?v=10"></script>
+  <script src="edgetts.js?v=10"></script>
+  <script src="voice.js?v=10"></script>
+  <script src="deeplinks.js?v=10"></script>
+  <script src="weather.js?v=10"></script>
+  <script src="router.js?v=10"></script>
+  <script src="super.js?v=10"></script>
+  <script src="intro.js?v=10"></script>
+  <script src="clap.js?v=10"></script>
+  <script src="standby.js?v=10"></script>
+  <script src="extras.js?v=10"></script>
+  <script src="movil.js?v=10"></script>
 </body>
 </html>

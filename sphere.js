@@ -28,7 +28,7 @@
     var golden = Math.PI * (3 - Math.sqrt(5));
     var NS = "http://www.w3.org/2000/svg";
 
-    svg.style.filter = "drop-shadow(0 0 2.4px " + fixed + ")";
+    svg.style.filter = "drop-shadow(0 0 2.6px " + fixed + ") drop-shadow(0 0 8px rgba(0,212,255,.14))";
     var g = document.createElementNS(NS, "g");
     svg.appendChild(g);
 
@@ -92,7 +92,7 @@
       var col = colorForState(useState) || { stroke: fixed, point: fixed };
       if (useState && mode !== lastMode) {
         lastMode = mode;
-        svg.style.filter = "drop-shadow(0 0 2.6px " + col.point + ")";
+        svg.style.filter = "drop-shadow(0 0 2.8px " + col.point + ") drop-shadow(0 0 9px rgba(0,212,255,.16))";
       }
       var proj = points.map(function (p) { return project(p, angleY, angleX); });
       lines.forEach(function (pair, idx) {

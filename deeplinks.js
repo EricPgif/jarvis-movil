@@ -38,18 +38,18 @@
     if (!target) return;
     var isScheme = !/^https?:/i.test(target);
     if (isScheme && httpsFallback) {
-      var t0 = Date.now();
       var fell = false;
-      function fallback() {
-        if (fell) return;
-        if (!document.hidden && Date.now() - t0 < 1600) { fell = true; window.location.href = httpsFallback; }
-      }
-      // Si la app se abre, la pestaña pasa a oculta → cancelamos el fallback.
-      document.addEventListener("visibilitychange", function once() {
-        document.removeEventListener("visibilitychange", once);
-      });
-      try { window.location.href = target; } catch (e) {}
-      setTimeout(fallback, 1000);
+      var onVis = function () {
+        if (document.hidden) { fell = true; document.removeEventListener("visibilitychange", onVis); }
+      };
+      document.addEventListener("visibilitychange", onVis);
+      try { window.location.href = target; }
+      catch (e) { fell = true; try { window.location.href = httpsFallback; } catch (e2) {} }
+      // Si la app NO se abrió (seguimos visibles) tras ~1.1s, vamos a la web.
+      setTimeout(function () {
+        document.removeEventListener("visibilitychange", onVis);
+        if (!fell && !document.hidden) { fell = true; try { window.location.href = httpsFallback; } catch (e) {} }
+      }, 1100);
     } else {
       try { window.location.href = target; } catch (e) {}
     }

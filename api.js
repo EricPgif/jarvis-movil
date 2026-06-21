@@ -29,12 +29,16 @@
       model: CFG.model, max_tokens: 1024, temperature: 0.4,
       system: SYSTEM, thinking: { type: "disabled" }, messages: history,
     };
+    var ctrl, to;
+    try { ctrl = new AbortController(); to = setTimeout(function () { ctrl.abort(); }, 45000); } catch (e) {}
     return fetch(CFG.base + "/v1/messages", {
       method: "POST",
       // SOLO estas dos cabeceras: el CORS de MiniMax bloquea x-api-key y anthropic-version.
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
       body: JSON.stringify(payload),
+      signal: ctrl && ctrl.signal,
     }).then(function (r) {
+      if (to) clearTimeout(to);
       return r.json().then(function (data) {
         if (!r.ok || data.error) {
           var msg = (data && data.error && (data.error.message || data.error)) || ("HTTP " + r.status);
@@ -46,6 +50,10 @@
         history.push({ role: "assistant", content: txt });
         return txt;
       });
+    }).catch(function (err) {
+      if (to) clearTimeout(to);
+      if (err && err.name === "AbortError") throw new Error("La respuesta tardó demasiado, señor. Inténtelo de nuevo.");
+      throw err;
     });
   }
 

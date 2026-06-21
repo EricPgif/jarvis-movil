@@ -27,21 +27,29 @@
     return "🌡️";
   }
 
-  // Devuelve una promesa con {temp, desc, icon, city}.
+  // Devuelve una promesa con {temp, desc, icon, city}. Cachea ubicación (cambia poco) y
+  // el resultado 5 min (evita repetir 2 fetch seguidos → menos batería).
+  var _loc = null, _wx = null, _wxTime = 0;
   function fetchWeather() {
-    return fetch("https://ipapi.co/json/").then(function (r) { return r.json(); }).then(function (loc) {
+    var now = new Date().getTime();
+    if (_wx && now - _wxTime < 5 * 60 * 1000) return Promise.resolve(_wx);
+    var locP = _loc ? Promise.resolve(_loc) : fetch("https://ipapi.co/json/").then(function (r) { return r.json(); });
+    return locP.then(function (loc) {
+      _loc = loc;
       var lat = loc.latitude, lon = loc.longitude, city = loc.city || "";
       var url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
                 "&current=temperature_2m,weather_code,is_day&timezone=auto";
       return fetch(url).then(function (r) { return r.json(); }).then(function (w) {
         var c = (w && w.current) || {};
         var night = c.is_day === 0;
-        return {
+        _wx = {
           temp: c.temperature_2m != null ? Math.round(c.temperature_2m) : null,
           desc: descFor(c.weather_code),
           icon: iconFor(c.weather_code, night),
           city: city,
         };
+        _wxTime = now;
+        return _wx;
       });
     });
   }

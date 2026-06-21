@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "1.9";
-  var WHATS_NEW = "Sonidos de interfaz (ticks al colocarse las apps en la intro y al tocar). Toggle en Ajustes.";
+  var APP_VERSION = "2.0";
+  var WHATS_NEW = "Modo Super: botones ARREGLADOS y centrado. Botones con feedback al tocar, más glow, deep links y chat más fiables. Optimizado.";
 
   // ── UI: mensajes y estado ──
   function addMsg(text, cls) {
