@@ -1,13 +1,15 @@
 /* Service worker de la PWA móvil de JARVIS (standalone).
    Cachea el "app shell" para que abra offline; las llamadas a MiniMax (otro origen)
    van SIEMPRE directas a la red (no se cachean). */
-const CACHE = "jarvis-movil-v7";
+const CACHE = "jarvis-movil-v8";
 const CORE = [
   "./", "./index.html", "./manifest.json",
   "./sphere.js", "./api.js", "./edgetts.js", "./voice.js", "./deeplinks.js", "./weather.js",
   "./router.js", "./super.js", "./intro.js", "./clap.js", "./standby.js", "./extras.js", "./movil.js",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png",
 ];
+
+self.addEventListener("message", (e) => { if (e.data === "skipWaiting") self.skipWaiting(); });
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();
@@ -26,10 +28,13 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   // Solo gestionamos el MISMO origen (la app). MiniMax (cross-origin) va directo a la red.
   if (url.origin !== location.origin) return;
-  // App shell: network-first con respaldo a caché (recibe updates y funciona offline).
+  if (e.request.method !== "GET") return;
+  // App shell: SIEMPRE lo más nuevo. cache:"no-store" salta la caché HTTP/CDN del navegador
+  // (antes podía servir HTML/JS viejo aunque hubiera versión nueva → no se actualizaba).
+  // Respaldo a caché solo si no hay red (offline).
   e.respondWith(
-    fetch(e.request).then((r) => {
-      if (r.ok && e.request.method === "GET") {
+    fetch(new Request(url.href, { cache: "no-store" })).then((r) => {
+      if (r && r.ok) {
         const c = r.clone();
         caches.open(CACHE).then((x) => x.put(e.request, c)).catch(() => {});
       }

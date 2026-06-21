@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "1.7";
-  var WHATS_NEW = "Voz de JARVIS de las pelis (AlvaroNeural), Super centrado, sin el popup de contraseñas.";
+  var APP_VERSION = "1.8";
+  var WHATS_NEW = "Ya se actualiza sola de verdad (botón 🔄 en Ajustes). Voz de las pelis, Super centrado, sin popup de contraseñas.";
 
   // ── UI: mensajes y estado ──
   function addMsg(text, cls) {
@@ -131,6 +131,7 @@
     $("cfg-base").value = CFG.base;
     $("cfg-model").value = CFG.model;
     if (window.Extras) window.Extras.init();   // Comandos / Mis Apps / Diagnóstico
+    var vl = $("ver-label"); if (vl) vl.textContent = "JARVIS móvil · v" + APP_VERSION;
     $("modal").classList.add("show");
   }
   function closeSettings() { $("modal").classList.remove("show"); }
@@ -188,6 +189,7 @@
     $("cfg-x").addEventListener("click", closeSettings);
     $("cfg-save").addEventListener("click", saveSettings);
     $("cfg-install").addEventListener("click", doInstall);
+    $("cfg-update").addEventListener("click", forceUpdate);
     $("btn-super").addEventListener("click", function () { Voice.unlock(); if (window.Super) window.Super.show(); });
     $("moon").addEventListener("click", function () { if (window.Standby) window.Standby.show(); });
     window.addEventListener("online", refreshOnline);
@@ -196,6 +198,7 @@
   }
 
   // ── Auto-actualización (sin reinstalar) ──
+  var _swReg = null;
   function setupAutoUpdate() {
     if (!("serviceWorker" in navigator)) return;
     var hadController = !!navigator.serviceWorker.controller;
@@ -206,14 +209,26 @@
       refreshing = true;
       window.location.reload();                               // nueva versión lista → recarga sola
     });
-    navigator.serviceWorker.register("sw.js").then(function (reg) {
+    // updateViaCache:"none" → el navegador comprueba sw.js SIEMPRE fresco (no cacheado).
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(function (reg) {
+      _swReg = reg;
       try { reg.update(); } catch (e) {}
-      // Comprueba si hay versión nueva cada minuto y al volver a la app.
       setInterval(function () { try { reg.update(); } catch (e) {} }, 60000);
       document.addEventListener("visibilitychange", function () {
         if (!document.hidden) { try { reg.update(); } catch (e) {} }
       });
     }).catch(function () {});
+  }
+  // Botón manual: fuerza la búsqueda + recarga a la última versión.
+  function forceUpdate() {
+    addMsg("🔄 Buscando versión nueva, señor…", "sys");
+    var go = function () { try { window.location.reload(true); } catch (e) { window.location.reload(); } };
+    if (_swReg) {
+      _swReg.update().then(function () {
+        if (_swReg.waiting) { try { _swReg.waiting.postMessage("skipWaiting"); } catch (e) {} }
+        setTimeout(go, 900);
+      }).catch(go);
+    } else { go(); }
   }
   function notifyVersion() {
     try {
