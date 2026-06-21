@@ -84,6 +84,7 @@
             ? "Permiso de micrófono denegado, señor. Actívalo: toca el candado 🔒 de la barra del navegador → Micrófono → Permitir."
           : err === "no-speech" ? "No te he oído, señor. Inténtalo otra vez."
           : err === "network" ? "El dictado por voz necesita conexión y a veces falla en la app instalada; prueba abriéndola en Chrome, señor."
+          : err === "timeout" ? "El micro no respondió, señor. En la app instalada el dictado suele fallar: ábrela en Chrome y permite el micrófono."
           : err === "aborted" ? null
           : "El dictado por voz no funcionó (" + err + "). En Android usa Chrome; en iPhone no está soportado, escribe y te respondo hablando.";
         if (msg) addMsg(msg, "sys");
@@ -125,7 +126,6 @@
     $("cfg-key").value = CFG.key;
     $("cfg-base").value = CFG.base;
     $("cfg-model").value = CFG.model;
-    $("cfg-clap").classList.toggle("on", CFG.clap);
     $("modal").classList.add("show");
   }
   function closeSettings() { $("modal").classList.remove("show"); }
@@ -183,10 +183,6 @@
     $("cfg-x").addEventListener("click", closeSettings);
     $("cfg-save").addEventListener("click", saveSettings);
     $("cfg-install").addEventListener("click", doInstall);
-    $("cfg-clap").addEventListener("click", function () {
-      var on = !CFG.clap; CFG.clap = on; this.classList.toggle("on", on);
-      if (window.Clap) { on ? window.Clap.start() : window.Clap.stop(); }
-    });
     $("btn-super").addEventListener("click", function () { Voice.unlock(); if (window.Super) window.Super.show(); });
     $("moon").addEventListener("click", function () { if (window.Standby) window.Standby.show(); });
     window.addEventListener("online", refreshOnline);
@@ -204,11 +200,6 @@
     if (isStandalone()) { var blk = document.querySelector(".cfg-block"); if (blk) blk.style.display = "none"; }
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
 
-    // Si la doble palmada estaba activada, arráncala en el PRIMER toque (iOS exige gesto).
-    if (CFG.clap && window.Clap) {
-      var startClap = function () { document.removeEventListener("pointerdown", startClap); window.Clap.start(); };
-      document.addEventListener("pointerdown", startClap, { once: true });
-    }
 
     // Saludo / pedir key — DESPUÉS de la intro.
     function start() {

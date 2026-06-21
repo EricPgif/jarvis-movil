@@ -5,10 +5,18 @@
 
   // ── TTS ──
   var _voice = null, _unlocked = false;
+  // Voz de JARVIS = MASCULINA en español (no la femenina por defecto). Best-effort por
+  // nombre (varía según el móvil): prioriza es-ES masculina.
+  var MALE = /(jorge|pablo|diego|enrique|carlos|miguel|alvaro|álvaro|male|hombre|masc)/i;
   function pickVoice() {
     try {
       var vs = speechSynthesis.getVoices() || [];
-      _voice = vs.filter(function (v) { return /^es/i.test(v.lang); })[0] || vs[0] || null;
+      var es = vs.filter(function (v) { return /^es/i.test(v.lang); });
+      _voice =
+        es.filter(function (v) { return /es[-_]ES/i.test(v.lang) && MALE.test(v.name); })[0] ||
+        es.filter(function (v) { return MALE.test(v.name); })[0] ||
+        es.filter(function (v) { return /es[-_]ES/i.test(v.lang); })[0] ||
+        es[0] || vs[0] || null;
     } catch (e) {}
   }
   if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
@@ -27,7 +35,7 @@
       var u = new SpeechSynthesisUtterance(String(text).replace(/J\.A\.R\.V\.I\.S\.?/g, "Jarvis"));
       if (_voice) u.voice = _voice;
       u.lang = (_voice && _voice.lang) || "es-ES";
-      u.rate = 1.0; u.pitch = 1.0;
+      u.rate = 0.98; u.pitch = 0.9;   // tono algo grave = mayordomo JARVIS
       u.onstart = function () { if (onstart) onstart(); };
       u.onend = function () { if (onend) onend(); };
       u.onerror = function () { if (onend) onend(); };
@@ -44,16 +52,18 @@
     rec = new SR();
     rec.lang = "es-ES"; rec.interimResults = false; rec.maxAlternatives = 1;
   }
-  var _onResult = null, _onState = null, _onError = null;
+  var _onResult = null, _onState = null, _onError = null, _guard = null;
+  function clearGuard() { if (_guard) { clearTimeout(_guard); _guard = null; } }
   if (rec) {
     rec.onresult = function (e) {
+      clearGuard();
       var t = e.results[0][0].transcript;
       listening = false; if (_onState) _onState(false);
       if (_onResult) _onResult(t);
     };
-    rec.onend = function () { listening = false; if (_onState) _onState(false); };
+    rec.onend = function () { clearGuard(); listening = false; if (_onState) _onState(false); };
     rec.onerror = function (e) {
-      listening = false; if (_onState) _onState(false);
+      clearGuard(); listening = false; if (_onState) _onState(false);
       if (_onError) _onError((e && e.error) || "error");
     };
   }
@@ -63,8 +73,20 @@
     if (!rec) return { ok: false, reason: "no-stt" };
     if (listening) { try { rec.stop(); } catch (e) {} return { ok: true, stopped: true }; }
     cancel();
-    try { rec.start(); listening = true; if (onState) onState(true); return { ok: true, started: true }; }
-    catch (e) { return { ok: false, reason: "start-failed" }; }
+    try {
+      rec.start(); listening = true; if (onState) onState(true);
+      // Anti-cuelgue: si en 10 s no llega resultado ni fin (pasa en algunos móviles/PWA
+      // instalada), forzamos parada y avisamos en vez de quedarnos colgados en verde.
+      clearGuard();
+      _guard = setTimeout(function () {
+        if (!listening) return;
+        try { rec.stop(); } catch (e) {}
+        try { rec.abort(); } catch (e) {}
+        listening = false; if (_onState) _onState(false);
+        if (_onError) _onError("timeout");
+      }, 10000);
+      return { ok: true, started: true };
+    } catch (e) { return { ok: false, reason: "start-failed" }; }
   }
   function stopListen() { if (rec && listening) { try { rec.stop(); } catch (e) {} } }
   function isListening() { return listening; }
