@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "1.8";
-  var WHATS_NEW = "Ya se actualiza sola de verdad (botón 🔄 en Ajustes). Voz de las pelis, Super centrado, sin popup de contraseñas.";
+  var APP_VERSION = "1.9";
+  var WHATS_NEW = "Sonidos de interfaz (ticks al colocarse las apps en la intro y al tocar). Toggle en Ajustes.";
 
   // ── UI: mensajes y estado ──
   function addMsg(text, cls) {
@@ -131,6 +131,7 @@
     $("cfg-base").value = CFG.base;
     $("cfg-model").value = CFG.model;
     if (window.Extras) window.Extras.init();   // Comandos / Mis Apps / Diagnóstico
+    if (window.sfx) $("cfg-sfx").classList.toggle("on", window.sfx.enabled);
     var vl = $("ver-label"); if (vl) vl.textContent = "JARVIS móvil · v" + APP_VERSION;
     $("modal").classList.add("show");
   }
@@ -180,7 +181,15 @@
   }
 
   // ── Wire general ──
+  var _sfxUnlocked = false;
   function wire() {
+    // Sonido al tocar botones (y desbloqueo del audio en el primer gesto).
+    document.addEventListener("pointerdown", function (e) {
+      if (!window.sfx) return;
+      if (!_sfxUnlocked) { window.sfx.unlock(); _sfxUnlocked = true; }
+      var el = e.target && e.target.closest ? e.target.closest("button, .qbtn, .sup-app, .nav-item") : null;
+      if (el) window.sfx.tap();
+    }, { passive: true });
     $("send").addEventListener("click", function () { Voice.unlock(); handle($("text").value); });
     $("text").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); handle($("text").value); } });
     $("mic").addEventListener("click", toggleMic);
@@ -190,6 +199,11 @@
     $("cfg-save").addEventListener("click", saveSettings);
     $("cfg-install").addEventListener("click", doInstall);
     $("cfg-update").addEventListener("click", forceUpdate);
+    $("cfg-sfx").addEventListener("click", function () {
+      if (!window.sfx) return;
+      var on = !window.sfx.enabled; window.sfx.setEnabled(on);
+      this.classList.toggle("on", on); if (on) window.sfx.beep();
+    });
     $("btn-super").addEventListener("click", function () { Voice.unlock(); if (window.Super) window.Super.show(); });
     $("moon").addEventListener("click", function () { if (window.Standby) window.Standby.show(); });
     window.addEventListener("online", refreshOnline);

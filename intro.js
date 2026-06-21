@@ -64,6 +64,7 @@
     v.classList.add("show");
 
     Sphere.make(document.getElementById("intro-sphere"), { state: false, N: 96, R: 84, color: "#00d4ff" });
+    if (window.sfx) { window.sfx.unlock(); window.sfx.whoosh(); }   // arranque
 
     // Reloj de la intro
     var now = new Date();
@@ -96,6 +97,7 @@
           el.style.transition = "transform " + CFG_INTRO.iconDur + "ms cubic-bezier(.2,.8,.2,1), opacity 300ms ease";
           el.style.transform = "translate(0,0) scale(1)";
           el.style.opacity = "1";
+          if (window.sfx) window.sfx.place(i);   // "tick" al colocarse cada app
         }, i * CFG_INTRO.iconStagger);
       });
       // El reloj sube del centro a su sitio (arriba).
@@ -112,6 +114,7 @@
     function finish() {
       clearTimeout(finishTimer);
       v.removeEventListener("click", finish);
+      if (window.sfx) window.sfx.chord();   // acorde de arranque al resolver
       v.classList.add("fade");
       setTimeout(function () { v.classList.remove("show", "fade"); v.style.display = "none"; if (onDone) onDone(); }, CFG_INTRO.fade);
     }
