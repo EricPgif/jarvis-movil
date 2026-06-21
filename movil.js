@@ -6,6 +6,10 @@
   var $ = function (id) { return document.getElementById(id); };
   var busy = false;
 
+  // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
+  var APP_VERSION = "1.6";
+  var WHATS_NEW = "Ahora se actualiza sola (sin reinstalar). Voz masculina, Modo Super pulido, Comandos, Mis Apps y Diagnóstico.";
+
   // ── UI: mensajes y estado ──
   function addMsg(text, cls) {
     var d = document.createElement("div");
@@ -191,6 +195,36 @@
     wireDock();
   }
 
+  // ── Auto-actualización (sin reinstalar) ──
+  function setupAutoUpdate() {
+    if (!("serviceWorker" in navigator)) return;
+    var hadController = !!navigator.serviceWorker.controller;
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (refreshing) return;
+      if (!hadController) { hadController = true; return; }   // 1ª instalación: no recargar
+      refreshing = true;
+      window.location.reload();                               // nueva versión lista → recarga sola
+    });
+    navigator.serviceWorker.register("sw.js").then(function (reg) {
+      try { reg.update(); } catch (e) {}
+      // Comprueba si hay versión nueva cada minuto y al volver a la app.
+      setInterval(function () { try { reg.update(); } catch (e) {} }, 60000);
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) { try { reg.update(); } catch (e) {} }
+      });
+    }).catch(function () {});
+  }
+  function notifyVersion() {
+    try {
+      var prev = localStorage.getItem("jv_ver");
+      if (prev && prev !== APP_VERSION) {
+        addMsg("✨ JARVIS actualizado (v" + APP_VERSION + "): " + WHATS_NEW, "sys");
+      }
+      localStorage.setItem("jv_ver", APP_VERSION);
+    } catch (e) {}
+  }
+
   // ── Arranque ──
   function boot() {
     Sphere.make($("m-sphere"), { state: true, N: 84, R: 78 });
@@ -200,7 +234,8 @@
     wire();
     if (window.Extras) window.Extras.renderDock();   // accesos directos de "Mis Apps" en el dock
     if (isStandalone()) { var blk = document.querySelector(".cfg-block"); if (blk) blk.style.display = "none"; }
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
+    setupAutoUpdate();
+    notifyVersion();
 
 
     // Saludo / pedir key — DESPUÉS de la intro.
