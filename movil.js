@@ -78,6 +78,15 @@
       function (on) {
         $("mic").classList.toggle("on", on);
         setState(on ? "listening" : "");
+      },
+      function (err) {
+        var msg = err === "not-allowed" || err === "service-not-allowed"
+            ? "Permiso de micrófono denegado, señor. Actívalo: toca el candado 🔒 de la barra del navegador → Micrófono → Permitir."
+          : err === "no-speech" ? "No te he oído, señor. Inténtalo otra vez."
+          : err === "network" ? "El dictado por voz necesita conexión y a veces falla en la app instalada; prueba abriéndola en Chrome, señor."
+          : err === "aborted" ? null
+          : "El dictado por voz no funcionó (" + err + "). En Android usa Chrome; en iPhone no está soportado, escribe y te respondo hablando.";
+        if (msg) addMsg(msg, "sys");
       }
     );
   }
@@ -171,6 +180,7 @@
     $("mic").addEventListener("click", toggleMic);
     $("gear").addEventListener("click", openSettings);
     $("cfg-cancel").addEventListener("click", closeSettings);
+    $("cfg-x").addEventListener("click", closeSettings);
     $("cfg-save").addEventListener("click", saveSettings);
     $("cfg-install").addEventListener("click", doInstall);
     $("cfg-clap").addEventListener("click", function () {
@@ -178,6 +188,7 @@
       if (window.Clap) { on ? window.Clap.start() : window.Clap.stop(); }
     });
     $("btn-super").addEventListener("click", function () { Voice.unlock(); if (window.Super) window.Super.show(); });
+    $("moon").addEventListener("click", function () { if (window.Standby) window.Standby.show(); });
     window.addEventListener("online", refreshOnline);
     window.addEventListener("offline", refreshOnline);
     wireDock();
@@ -208,6 +219,7 @@
         addMsg("J.A.R.V.I.S. a su servicio, señor. Hábleme o escriba.", "jv");
       }
     }
+    if (window.Standby && window.Standby.start) window.Standby.start();   // espera tras 2 min sin tocar
     if (window.Intro && window.Intro.play) window.Intro.play(start);
     else start();
   }

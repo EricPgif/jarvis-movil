@@ -44,7 +44,7 @@
     rec = new SR();
     rec.lang = "es-ES"; rec.interimResults = false; rec.maxAlternatives = 1;
   }
-  var _onResult = null, _onState = null;
+  var _onResult = null, _onState = null, _onError = null;
   if (rec) {
     rec.onresult = function (e) {
       var t = e.results[0][0].transcript;
@@ -52,11 +52,14 @@
       if (_onResult) _onResult(t);
     };
     rec.onend = function () { listening = false; if (_onState) _onState(false); };
-    rec.onerror = function () { listening = false; if (_onState) _onState(false); };
+    rec.onerror = function (e) {
+      listening = false; if (_onState) _onState(false);
+      if (_onError) _onError((e && e.error) || "error");
+    };
   }
 
-  function toggleListen(onResult, onState) {
-    _onResult = onResult; _onState = onState;
+  function toggleListen(onResult, onState, onError) {
+    _onResult = onResult; _onState = onState; _onError = onError;
     if (!rec) return { ok: false, reason: "no-stt" };
     if (listening) { try { rec.stop(); } catch (e) {} return { ok: true, stopped: true }; }
     cancel();
