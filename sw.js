@@ -1,7 +1,7 @@
 /* Service worker de la PWA móvil de JARVIS (standalone).
    Cachea el "app shell" para que abra offline; las llamadas a MiniMax (otro origen)
    van SIEMPRE directas a la red (no se cachean). */
-const CACHE = "jarvis-movil-v3";
+const CACHE = "jarvis-movil-v4";
 const CORE = [
   "./", "./index.html", "./manifest.json",
   "./sphere.js", "./api.js", "./voice.js", "./deeplinks.js", "./weather.js",
