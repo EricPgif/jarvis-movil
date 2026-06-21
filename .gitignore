@@ -1,0 +1,6 @@
+# Nada sensible debe entrar aquí. La API key vive solo en el móvil (localStorage).
+config.json
+*.key
+.env
+.DS_Store
+Thumbs.db
