@@ -1,8 +1,13 @@
 /* Service worker de la PWA móvil de JARVIS (standalone).
    Cachea el "app shell" para que abra offline; las llamadas a MiniMax (otro origen)
    van SIEMPRE directas a la red (no se cachean). */
-const CACHE = "jarvis-movil-v1";
-const CORE = ["./", "./index.html", "./movil.js", "./manifest.json"];
+const CACHE = "jarvis-movil-v2";
+const CORE = [
+  "./", "./index.html", "./manifest.json",
+  "./sphere.js", "./api.js", "./voice.js", "./deeplinks.js", "./weather.js",
+  "./router.js", "./super.js", "./intro.js", "./clap.js", "./movil.js",
+  "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();

@@ -1,27 +1,12 @@
-/* J.A.R.V.I.S móvil — standalone (PC apagado).
-   Habla DIRECTO con MiniMax (que está en la nube) desde el navegador del móvil.
-   La API key se guarda SOLO en este móvil (localStorage), nunca en el código. */
+/* movil.js — Orquestador de la app móvil JARVIS.
+   Une: router de comandos → MiniMax, voz, dock de apps, clima, reloj, esfera, ajustes, instalar PWA.
+   Sin backend Python; la key vive solo en este móvil (localStorage). */
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
-
-  // ── Config (localStorage) ──
-  var CFG = {
-    get key()   { return localStorage.getItem("mm_key") || ""; },
-    get base()  { return (localStorage.getItem("mm_base") || "https://api.minimax.io/anthropic").replace(/\/+$/, ""); },
-    get model() { return localStorage.getItem("mm_model") || "MiniMax-M2"; },
-  };
-
-  var SYSTEM = "Eres J.A.R.V.I.S., el asistente personal de Eric, en español de España. " +
-    "Educado (trátale de «señor»), inteligente y CONCISO. Te crearon Eric y Artur. " +
-    "NO uses emojis. Responde directo y con naturalidad; el conocimiento general respóndelo " +
-    "tú mismo (tu conocimiento llega hasta 2026). Estás en su móvil: puedes conversar y " +
-    "ayudar, pero no controlas su PC desde aquí.";
-
-  var history = [];           // [{role:'user'|'assistant', content:'...'}]
   var busy = false;
 
-  // ── UI helpers ──
+  // ── UI: mensajes y estado ──
   function addMsg(text, cls) {
     var d = document.createElement("div");
     d.className = "msg " + cls;
@@ -29,64 +14,41 @@
     var log = $("log");
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
+    // Espeja en el chat del Modo Super si está montado.
+    var slog = $("super-log");
+    if (slog) {
+      var c = d.cloneNode(true);
+      slog.appendChild(c);
+      slog.scrollTop = slog.scrollHeight;
+    }
     return d;
   }
-  function setState(s) {            // '', 'listening', 'speaking', 'thinking'
-    document.body.classList.remove("sp-listening", "sp-speaking");
-    if (s === "listening") document.body.classList.add("sp-listening");
-    if (s === "speaking") document.body.classList.add("sp-speaking");
-    $("status").textContent =
-      s === "listening" ? "ESCUCHANDO" : s === "speaking" ? "HABLANDO" : s === "thinking" ? "PROCESANDO…" : "EN LÍNEA";
+  function setState(s) {   // '', 'listening', 'speaking', 'thinking'
+    Sphere.setMode(s === "thinking" ? "processing" : (s || "idle"));
+    $("m-status").textContent =
+      s === "listening" ? "ESCUCHANDO" : s === "speaking" ? "HABLANDO" :
+      s === "thinking" ? "PROCESANDO…" : "EN LÍNEA";
   }
 
-  // ── Llamada DIRECTA a MiniMax (formato Anthropic, igual que jarvis_minimax.py) ──
-  function askMiniMax(userText) {
-    var key = CFG.key;
-    if (!key) { openSettings(); return Promise.reject(new Error("sin key")); }
-    history.push({ role: "user", content: userText });
-    if (history.length > 16) history = history.slice(-16);
-    var payload = {
-      model: CFG.model,
-      max_tokens: 1024,
-      temperature: 0.4,
-      system: SYSTEM,
-      thinking: { type: "disabled" },   // M2 razona y gasta tokens → lo desactivamos
-      messages: history,
-    };
-    return fetch(CFG.base + "/v1/messages", {
-      method: "POST",
-      headers: {
-        // SOLO estas dos: el CORS de MiniMax no permite x-api-key ni anthropic-version
-        // como cabeceras del navegador (el preflight las bloquearía → "Failed to fetch").
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + key,
-      },
-      body: JSON.stringify(payload),
-    }).then(function (r) {
-      return r.json().then(function (data) {
-        if (!r.ok || data.error) {
-          var msg = (data && data.error && (data.error.message || data.error)) || ("HTTP " + r.status);
-          throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
-        }
-        var txt = "";
-        (data.content || []).forEach(function (b) { if (b && b.type === "text") txt += (b.text || ""); });
-        txt = txt.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "").trim();
-        history.push({ role: "assistant", content: txt });
-        return txt;
-      });
-    });
-  }
-
-  // ── Enviar (texto o voz) ──
-  function send(text) {
+  // ── Núcleo: procesar una orden (de voz o texto) ──
+  function handle(text) {
     text = (text || "").trim();
     if (!text || busy) return;
-    busy = true;
     addMsg(text, "me");
     $("text").value = "";
+
+    // 1) ¿Acción local? (abrir app, Modo Super, Dexter, etc.)
+    var routed = Router.routeCommand(text);
+    if (routed.handled) {
+      if (routed.say) { addMsg(routed.say, "jv"); speak(routed.say); }
+      return;
+    }
+    // 2) Si no, va al cerebro (MiniMax).
+    if (!CFG.key) { addMsg("Falta tu API key, señor. Pulsa el engranaje ⚙.", "jv"); openSettings(); return; }
+    busy = true;
     setState("thinking");
     var thinking = addMsg("…", "jv");
-    askMiniMax(text).then(function (reply) {
+    API.askMiniMax(text).then(function (reply) {
       thinking.textContent = reply || "(sin respuesta)";
       $("log").scrollTop = $("log").scrollHeight;
       busy = false;
@@ -94,96 +56,165 @@
     }).catch(function (e) {
       thinking.textContent = "Error: " + (e.message || e);
       thinking.classList.add("sys");
-      busy = false;
-      setState("");
+      busy = false; setState("");
     });
   }
 
-  // ── TTS (voz del navegador) ──
-  var _voice = null;
-  function pickVoice() {
-    try {
-      var vs = speechSynthesis.getVoices() || [];
-      _voice = vs.filter(function (v) { return /^es/i.test(v.lang); })[0] || vs[0] || null;
-    } catch (e) {}
-  }
-  if ("speechSynthesis" in window) {
-    pickVoice();
-    speechSynthesis.onvoiceschanged = pickVoice;
-  }
   function speak(text) {
-    if (!text || !("speechSynthesis" in window)) { setState(""); return; }
-    try {
-      speechSynthesis.cancel();
-      var u = new SpeechSynthesisUtterance(text);
-      if (_voice) u.voice = _voice;
-      u.lang = (_voice && _voice.lang) || "es-ES";
-      u.rate = 1.0; u.pitch = 1.0;
-      u.onstart = function () { setState("speaking"); };
-      u.onend = function () { setState(""); };
-      u.onerror = function () { setState(""); };
-      speechSynthesis.speak(u);
-    } catch (e) { setState(""); }
+    if (!text) { setState(""); return; }
+    setState("speaking");
+    Voice.speak(text, null, function () { setState(""); });
   }
 
-  // ── STT (voz del navegador) ──
-  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var rec = null, listening = false;
-  if (SR) {
-    rec = new SR();
-    rec.lang = "es-ES";
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    rec.onresult = function (e) {
-      var t = e.results[0][0].transcript;
-      listening = false; $("mic").classList.remove("on");
-      send(t);
-    };
-    rec.onend = function () { listening = false; $("mic").classList.remove("on"); if (!busy) setState(""); };
-    rec.onerror = function (e) { listening = false; $("mic").classList.remove("on"); setState(""); };
-  }
+  // ── Voz (micro) ──
   function toggleMic() {
-    if (!rec) { addMsg("Tu navegador no soporta dictado por voz; escribe el mensaje.", "sys"); return; }
-    if (listening) { try { rec.stop(); } catch (e) {} return; }
-    try { speechSynthesis.cancel(); } catch (e) {}
-    try { rec.start(); listening = true; $("mic").classList.add("on"); setState("listening"); } catch (e) {}
+    Voice.unlock();
+    if (!Voice.sttSupported) {
+      addMsg("El dictado por voz no está disponible en este navegador (iPhone/Safari no lo soporta). Escribe el mensaje y te responderé hablando, señor.", "sys");
+      return;
+    }
+    Voice.toggleListen(
+      function (t) { setState(""); handle(t); },
+      function (on) {
+        $("mic").classList.toggle("on", on);
+        setState(on ? "listening" : "");
+      }
+    );
   }
 
-  // ── Ajustes (key) ──
+  // ── Reloj ──
+  function tickClock() {
+    var now = new Date();
+    var hh = String(now.getHours()).padStart(2, "0");
+    var mm = String(now.getMinutes()).padStart(2, "0");
+    var ss = String(now.getSeconds()).padStart(2, "0");
+    $("m-clock").textContent = hh + ":" + mm + ":" + ss;
+    var dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+    var meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+    $("m-date").textContent = dias[now.getDay()] + ", " + now.getDate() + " " + meses[now.getMonth()] + " " + now.getFullYear();
+  }
+
+  // ── Clima ──
+  function loadWeather() {
+    Weather.fetch().then(function (w) {
+      if (w.temp != null) $("wx-temp").textContent = w.temp;
+      $("wx-icon").textContent = w.icon;
+      $("wx-desc").textContent = (w.desc + (w.city ? " · " + w.city : "")).toUpperCase();
+    }).catch(function () { /* sin red: deja el placeholder */ });
+  }
+
+  // ── Estado online ──
+  function refreshOnline() {
+    var on = navigator.onLine !== false;
+    var el = $("m-online");
+    el.classList.toggle("off", !on);
+    el.lastChild.textContent = on ? "ONLINE" : "SIN RED";
+  }
+
+  // ── Ajustes / instalación ──
   function openSettings() {
     $("cfg-key").value = CFG.key;
     $("cfg-base").value = CFG.base;
     $("cfg-model").value = CFG.model;
+    $("cfg-clap").classList.toggle("on", CFG.clap);
     $("modal").classList.add("show");
   }
   function closeSettings() { $("modal").classList.remove("show"); }
   function saveSettings() {
-    var k = $("cfg-key").value.trim();
-    localStorage.setItem("mm_key", k);
+    localStorage.setItem("mm_key", $("cfg-key").value.trim());
     localStorage.setItem("mm_base", ($("cfg-base").value.trim() || "https://api.minimax.io/anthropic"));
     localStorage.setItem("mm_model", ($("cfg-model").value.trim() || "MiniMax-M2"));
     closeSettings();
-    if (k) addMsg("Listo, señor. Configuración guardada. ¿En qué puedo ayudarle?", "jv");
+    if (CFG.key) addMsg("Configuración guardada, señor. ¿En qué puedo ayudarle?", "jv");
   }
 
-  // ── Wire ──
-  $("send").addEventListener("click", function () { send($("text").value); });
-  $("text").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); send($("text").value); } });
-  $("mic").addEventListener("click", toggleMic);
-  $("gear").addEventListener("click", openSettings);
-  $("cfg-cancel").addEventListener("click", closeSettings);
-  $("cfg-save").addEventListener("click", saveSettings);
+  // PWA install
+  var deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferredPrompt = e; });
+  function isStandalone() {
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  }
+  function doInstall() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.finally(function () { deferredPrompt = null; });
+    } else if (isStandalone()) {
+      $("install-hint").textContent = "Ya tienes JARVIS instalado, señor. ✓";
+    } else {
+      // iOS Safari (sin beforeinstallprompt): instrucción manual.
+      var iOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      $("install-hint").innerHTML = iOS
+        ? "En iPhone: pulsa <b>Compartir</b> (el cuadro con la flecha ↑) y luego <b>«Añadir a pantalla de inicio»</b>."
+        : "Abre el menú del navegador (⋮) y elige <b>«Instalar app»</b> o <b>«Añadir a pantalla de inicio»</b>.";
+    }
+  }
+
+  // ── Dock de apps ──
+  function wireDock() {
+    document.querySelectorAll(".qbtn").forEach(function (b) {
+      b.addEventListener("click", function () {
+        Voice.unlock();
+        if (b.dataset.cam) { $("cam").click(); return; }
+        var say = Links.openApp(b.dataset.app);
+        if (say) addMsg(say, "jv");
+      });
+    });
+    $("cam").addEventListener("change", function () {
+      if (this.files && this.files[0]) addMsg("Foto capturada, señor.", "sys");
+    });
+  }
+
+  // ── Wire general ──
+  function wire() {
+    $("send").addEventListener("click", function () { Voice.unlock(); handle($("text").value); });
+    $("text").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); handle($("text").value); } });
+    $("mic").addEventListener("click", toggleMic);
+    $("gear").addEventListener("click", openSettings);
+    $("cfg-cancel").addEventListener("click", closeSettings);
+    $("cfg-save").addEventListener("click", saveSettings);
+    $("cfg-install").addEventListener("click", doInstall);
+    $("cfg-clap").addEventListener("click", function () {
+      var on = !CFG.clap; CFG.clap = on; this.classList.toggle("on", on);
+      if (window.Clap) { on ? window.Clap.start() : window.Clap.stop(); }
+    });
+    $("btn-super").addEventListener("click", function () { Voice.unlock(); if (window.Super) window.Super.show(); });
+    window.addEventListener("online", refreshOnline);
+    window.addEventListener("offline", refreshOnline);
+    wireDock();
+  }
 
   // ── Arranque ──
-  if (!CFG.key) {
-    addMsg("Bienvenido, señor. Pulse el engranaje ⚙ e introduzca su API key de MiniMax para empezar.", "jv");
-    openSettings();
-  } else {
-    addMsg("J.A.R.V.I.S. a su servicio, señor. Hábleme o escriba.", "jv");
+  function boot() {
+    Sphere.make($("m-sphere"), { state: true, N: 84, R: 78 });
+    tickClock(); setInterval(tickClock, 1000);
+    refreshOnline();
+    loadWeather(); setInterval(loadWeather, 10 * 60 * 1000);
+    wire();
+    if (isStandalone()) { var blk = document.querySelector(".cfg-block"); if (blk) blk.style.display = "none"; }
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
+
+    // Si la doble palmada estaba activada, arráncala en el PRIMER toque (iOS exige gesto).
+    if (CFG.clap && window.Clap) {
+      var startClap = function () { document.removeEventListener("pointerdown", startClap); window.Clap.start(); };
+      document.addEventListener("pointerdown", startClap, { once: true });
+    }
+
+    // Saludo / pedir key — DESPUÉS de la intro.
+    function start() {
+      if (!CFG.key) {
+        addMsg("Bienvenido, señor. Pulse el engranaje ⚙ e introduzca su API key de MiniMax para empezar.", "jv");
+        openSettings();
+      } else {
+        addMsg("J.A.R.V.I.S. a su servicio, señor. Hábleme o escriba.", "jv");
+      }
+    }
+    if (window.Intro && window.Intro.play) window.Intro.play(start);
+    else start();
   }
 
-  // ── PWA service worker ──
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch(function () {});
-  }
+  // Exponer utilidades para otros módulos (super, intro).
+  window.APP = { handle: handle, addMsg: addMsg, setState: setState, speak: speak, openSettings: openSettings, mic: toggleMic };
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
 })();
