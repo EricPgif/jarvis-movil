@@ -5,7 +5,7 @@ const CACHE = "jarvis-movil-v5";
 const CORE = [
   "./", "./index.html", "./manifest.json",
   "./sphere.js", "./api.js", "./voice.js", "./deeplinks.js", "./weather.js",
-  "./router.js", "./super.js", "./intro.js", "./clap.js", "./standby.js", "./movil.js",
+  "./router.js", "./super.js", "./intro.js", "./clap.js", "./standby.js", "./extras.js", "./movil.js",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png",
 ];
 

@@ -126,6 +126,7 @@
     $("cfg-key").value = CFG.key;
     $("cfg-base").value = CFG.base;
     $("cfg-model").value = CFG.model;
+    if (window.Extras) window.Extras.init();   // Comandos / Mis Apps / Diagnóstico
     $("modal").classList.add("show");
   }
   function closeSettings() { $("modal").classList.remove("show"); }
@@ -197,6 +198,7 @@
     refreshOnline();
     loadWeather(); setInterval(loadWeather, 10 * 60 * 1000);
     wire();
+    if (window.Extras) window.Extras.renderDock();   // accesos directos de "Mis Apps" en el dock
     if (isStandalone()) { var blk = document.querySelector(".cfg-block"); if (blk) blk.style.display = "none"; }
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
 
