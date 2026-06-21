@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="manifest" href="manifest.json?v=6" />
+<link rel="manifest" href="manifest.json?v=7" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 <style>
   :root{
@@ -94,6 +94,7 @@
   .sheet p{margin:0 0 12px; font-size:13px; color:var(--text-dim);}
   .sheet label{display:block; font-size:12px; color:var(--text-dim); margin:10px 0 4px; letter-spacing:1px;}
   .sheet input[type=text],.sheet input[type=password]{width:100%; padding:11px 12px; font-size:15px; border-radius:10px; background:var(--bg); border:1px solid var(--border); color:var(--text); outline:none;}
+  .masked{-webkit-text-security:disc; text-security:disc;}
   .sheet .row{display:flex; gap:8px; margin-top:16px;}
   .btn{flex:1; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--cyan-soft); color:var(--cyan); font-size:15px; font-weight:600;}
   .btn.primary{background:var(--cyan); color:#022; border-color:var(--cyan);}
@@ -163,7 +164,7 @@
 
   <div class="bar">
     <button class="ico-btn mic" id="mic" aria-label="Hablar">🎙</button>
-    <input id="text" type="text" placeholder="Escribe o di «Jarvis»…" autocomplete="off" />
+    <input id="text" type="text" name="jvmsg" placeholder="Escribe o di «Jarvis»…" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" />
     <button class="ico-btn" id="send" aria-label="Enviar">➤</button>
     <input type="file" id="cam" accept="image/*" capture="environment" style="display:none" />
   </div>
@@ -179,7 +180,7 @@
       <h2>Configuración</h2>
       <p>Pega tu <b>API key de MiniMax</b>. Se guarda SOLO en este móvil.</p>
       <label>API KEY de MiniMax</label>
-      <input id="cfg-key" type="password" placeholder="sk-..." />
+      <input id="cfg-key" type="text" class="masked" name="jvkey" placeholder="sk-..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
       <label>URL base (avanzado)</label>
       <input id="cfg-base" type="text" placeholder="https://api.minimax.io/anthropic" />
       <label>Modelo</label>
@@ -218,17 +219,18 @@
     </div>
   </div>
 
-  <script src="sphere.js?v=6"></script>
-  <script src="api.js?v=6"></script>
-  <script src="voice.js?v=6"></script>
-  <script src="deeplinks.js?v=6"></script>
-  <script src="weather.js?v=6"></script>
-  <script src="router.js?v=6"></script>
-  <script src="super.js?v=6"></script>
-  <script src="intro.js?v=6"></script>
-  <script src="clap.js?v=6"></script>
-  <script src="standby.js?v=6"></script>
-  <script src="extras.js?v=6"></script>
-  <script src="movil.js?v=6"></script>
+  <script src="sphere.js?v=7"></script>
+  <script src="api.js?v=7"></script>
+  <script src="edgetts.js?v=7"></script>
+  <script src="voice.js?v=7"></script>
+  <script src="deeplinks.js?v=7"></script>
+  <script src="weather.js?v=7"></script>
+  <script src="router.js?v=7"></script>
+  <script src="super.js?v=7"></script>
+  <script src="intro.js?v=7"></script>
+  <script src="clap.js?v=7"></script>
+  <script src="standby.js?v=7"></script>
+  <script src="extras.js?v=7"></script>
+  <script src="movil.js?v=7"></script>
 </body>
 </html>

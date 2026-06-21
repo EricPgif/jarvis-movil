@@ -28,21 +28,37 @@
     try { var u = new SpeechSynthesisUtterance(""); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
   }
 
-  function speak(text, onstart, onend) {
+  function speakSystem(text, onstart, onend) {
     if (!text || !("speechSynthesis" in window)) { if (onend) onend(); return; }
     try {
       speechSynthesis.cancel();
-      var u = new SpeechSynthesisUtterance(String(text).replace(/J\.A\.R\.V\.I\.S\.?/g, "Jarvis"));
+      var u = new SpeechSynthesisUtterance(text);
       if (_voice) u.voice = _voice;
       u.lang = (_voice && _voice.lang) || "es-ES";
-      u.rate = 0.98; u.pitch = 0.9;   // tono algo grave = mayordomo JARVIS
+      u.rate = 1.0; u.pitch = 1.0;   // respaldo natural (la voz buena la da edge-tts)
       u.onstart = function () { if (onstart) onstart(); };
       u.onend = function () { if (onend) onend(); };
       u.onerror = function () { if (onend) onend(); };
       speechSynthesis.speak(u);
     } catch (e) { if (onend) onend(); }
   }
-  function cancel() { try { speechSynthesis.cancel(); } catch (e) {} }
+  function speak(text, onstart, onend) {
+    if (!text) { if (onend) onend(); return; }
+    cancel();
+    var clean = String(text).replace(/J\.A\.R\.V\.I\.S\.?/g, "Jarvis");
+    // 1) Voz JARVIS de las pelis (edge-tts AlvaroNeural). Si falla antes de sonar, voz del sistema.
+    if (window.EdgeTTS && window.EdgeTTS.available) {
+      var begun = false;
+      window.EdgeTTS.speak(clean, function () { begun = true; if (onstart) onstart(); }, onend)
+        .catch(function () { if (!begun) speakSystem(clean, onstart, onend); else if (onend) onend(); });
+      return;
+    }
+    speakSystem(clean, onstart, onend);
+  }
+  function cancel() {
+    try { speechSynthesis.cancel(); } catch (e) {}
+    try { if (window.EdgeTTS) window.EdgeTTS.stop(); } catch (e) {}
+  }
 
   // ── STT ──
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;

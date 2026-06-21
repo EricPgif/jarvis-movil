@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "1.6";
-  var WHATS_NEW = "Ahora se actualiza sola (sin reinstalar). Voz masculina, Modo Super pulido, Comandos, Mis Apps y Diagnóstico.";
+  var APP_VERSION = "1.7";
+  var WHATS_NEW = "Voz de JARVIS de las pelis (AlvaroNeural), Super centrado, sin el popup de contraseñas.";
 
   // ── UI: mensajes y estado ──
   function addMsg(text, cls) {

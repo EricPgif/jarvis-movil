@@ -34,9 +34,9 @@
   ];
 
   var CSS = `
-  #view-super{background:radial-gradient(circle at 50% 42%,#061a2b 0%,#02060d 66%,#01040b 100%);overflow:hidden;}
+  #view-super{background:radial-gradient(circle at 50% 45%,#061a2b 0%,#02060d 66%,#01040b 100%);overflow:hidden;}
   #view-super.show{display:block;}
-  .sup-grid{position:absolute;inset:0;background-image:radial-gradient(rgba(0,212,255,.08) 1px,transparent 1px);background-size:26px 26px;-webkit-mask-image:radial-gradient(circle at 50% 42%,#000 36%,transparent 74%);mask-image:radial-gradient(circle at 50% 42%,#000 36%,transparent 74%);}
+  .sup-grid{position:absolute;inset:0;background-image:radial-gradient(rgba(0,212,255,.08) 1px,transparent 1px);background-size:26px 26px;-webkit-mask-image:radial-gradient(circle at 50% 45%,#000 36%,transparent 74%);mask-image:radial-gradient(circle at 50% 45%,#000 36%,transparent 74%);}
   .sup-hud{position:absolute;font-size:10px;letter-spacing:1px;color:var(--text-dim);text-transform:uppercase;z-index:3;}
   .sup-tl{top:calc(12px + env(safe-area-inset-top));left:16px;}
   .sup-tl .t{font-size:22px;font-weight:700;color:#eafaff;letter-spacing:1px;font-variant-numeric:tabular-nums;}
@@ -46,15 +46,15 @@
   .sup-br{bottom:calc(96px + env(safe-area-inset-bottom));right:16px;text-align:right;color:var(--cyan);}
   .sup-close{position:absolute;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
     width:42px;height:42px;border-radius:50%;border:1px solid var(--border-hi);background:rgba(10,23,38,.7);color:var(--cyan);font-size:18px;z-index:6;}
-  .sup-core{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);width:clamp(230px,56vmin,360px);height:clamp(230px,56vmin,360px);display:flex;align-items:center;justify-content:center;z-index:1;}
+  .sup-core{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);width:clamp(230px,56vmin,360px);height:clamp(230px,56vmin,360px);display:flex;align-items:center;justify-content:center;z-index:1;}
   .sup-rings{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
   .sup-rings .rr{fill:none;stroke:rgba(0,212,255,.5);transform-box:fill-box;transform-origin:center;}
   .sup-rings .r1{stroke-width:.5;stroke-dasharray:2 9;animation:supSpin 90s linear infinite;}
   .sup-rings .r2{stroke-width:1;stroke-dasharray:34 14;opacity:.55;animation:supSpin 64s linear infinite reverse;}
   .sup-rings .r3{stroke-width:.7;stroke-dasharray:2 7;opacity:.5;animation:supSpin 46s linear infinite;}
   .sup-sphere{width:84%;height:84%;overflow:visible;}
-  .sup-title{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);font-weight:700;letter-spacing:clamp(2px,1vmin,6px);font-size:clamp(16px,4.6vmin,34px);color:#eafaff;text-shadow:0 0 18px rgba(0,212,255,.9);pointer-events:none;white-space:nowrap;z-index:2;}
-  .sup-ring{position:absolute;left:50%;top:42%;width:10px;height:10px;pointer-events:none;z-index:2;}
+  .sup-title{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);font-weight:700;letter-spacing:clamp(2px,1vmin,6px);font-size:clamp(16px,4.6vmin,34px);color:#eafaff;text-shadow:0 0 18px rgba(0,212,255,.9);pointer-events:none;white-space:nowrap;z-index:2;}
+  .sup-ring{position:absolute;left:50%;top:45%;width:10px;height:10px;pointer-events:none;z-index:2;}
   .sup-app{position:absolute;left:50%;top:50%;width:64px;margin:-42px 0 0 -32px;display:flex;flex-direction:column;align-items:center;gap:4px;
     border:0;background:transparent;padding:0;-webkit-appearance:none;appearance:none;
     --orbit-r:min(33vmin,166px);animation:supOrbit 130s linear infinite;animation-delay:var(--phase,0s);}
@@ -107,7 +107,7 @@
       '<div id="super-log"></div>' +
       '<div class="sup-bar">' +
         '<button class="sup-voice" id="sup-voice" aria-label="Voz">' + svg("mic") + '</button>' +
-        '<input id="sup-text" placeholder="Escribe o di «Jarvis»…" autocomplete="off" />' +
+        '<input id="sup-text" name="jvmsg2" placeholder="Escribe o di «Jarvis»…" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" />' +
         '<button class="sup-send" id="sup-send" aria-label="Enviar">➤</button>' +
       '</div>';
 
