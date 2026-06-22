@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "2.0";
-  var WHATS_NEW = "Modo Super: botones ARREGLADOS y centrado. Botones con feedback al tocar, más glow, deep links y chat más fiables. Optimizado.";
+  var APP_VERSION = "2.1";
+  var WHATS_NEW = "JARVIS más inteligente y natural: responde como una IA top, sabe la fecha/hora/clima de ahora y conversa mejor.";
 
   // ── UI: mensajes y estado ──
   function addMsg(text, cls) {
