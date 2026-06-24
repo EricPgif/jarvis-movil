@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "3.0";
-  var WHATS_NEW = "Cuando lanzo un agente verás una animación tipo reactor («Buscando en la web…»). Arreglado abrir WhatsApp. Chat un poco más compacto. (La búsqueda web necesita actualizar el Worker una vez.)";
+  var APP_VERSION = "3.1";
+  var WHATS_NEW = "Arreglada la VOZ del PC (Álvaro) en el móvil: ahora suena de verdad. Y «Buscar actualización» también aparece en la app instalada (no solo en web).";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -222,6 +222,7 @@
   function wire() {
     // Sonido al tocar botones (y desbloqueo del audio en el primer gesto).
     document.addEventListener("pointerdown", function (e) {
+      try { if (window.Voice && Voice.unlock) Voice.unlock(); } catch (e2) {}   // desbloquea audio (voz) en cualquier toque
       if (!window.sfx) return;
       if (!_sfxUnlocked) { window.sfx.unlock(); _sfxUnlocked = true; }
       var el = e.target && e.target.closest ? e.target.closest("button, .qbtn, .sup-app, .nav-item") : null;
@@ -329,7 +330,12 @@
     loadWeather(); setInterval(loadWeather, 10 * 60 * 1000);
     wire();
     if (window.Extras) window.Extras.renderDock();   // accesos directos de "Mis Apps" en el dock
-    if (isStandalone()) { var blk = document.querySelector(".cfg-block"); if (blk) blk.style.display = "none"; }
+    // Si ya está INSTALADA, oculta SOLO lo de instalar (no el bloque entero): "Buscar
+    // actualización" y "Borrar conversación" deben seguir visibles en la app instalada.
+    if (isStandalone()) {
+      ["cfg-install", "install-hint"].forEach(function (id) { var e = $(id); if (e) e.style.display = "none"; });
+      var tag = document.querySelector(".cfg-block .tag"); if (tag) tag.style.display = "none";
+    }
     setupAutoUpdate();
     notifyVersion();
 

@@ -21,8 +21,10 @@
   }
   if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 
-  // Desbloquea el TTS en el primer gesto (necesario en iOS).
+  // Desbloquea el TTS en el primer gesto (necesario en móvil/iOS): tanto la voz del PC (Worker,
+  // elemento <audio>) como la del sistema (speechSynthesis).
   function unlock() {
+    try { if (window.PCVoice && window.PCVoice.unlock) window.PCVoice.unlock(); } catch (e) {}
     if (_unlocked || !("speechSynthesis" in window)) return;
     _unlocked = true;
     try { var u = new SpeechSynthesisUtterance(""); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
