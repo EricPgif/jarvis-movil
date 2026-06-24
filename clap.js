@@ -54,13 +54,15 @@
     if (say && window.APP) { window.APP.addMsg("👏👏 " + say, "jv"); window.APP.speak(say); }
   }
 
-  function start() {
+  var wantRunning = false;   // ¿el usuario quiere las palmadas activas?
+  function acquire(announce) {
     if (running) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      if (window.APP) window.APP.addMsg("Tu navegador no permite escuchar palmadas, señor.", "sys");
+      if (announce && window.APP) window.APP.addMsg("Tu navegador no permite escuchar palmadas, señor.", "sys");
       return;
     }
     navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } }).then(function (s) {
+      if (!wantRunning) { s.getTracks().forEach(function (t) { t.stop(); }); return; }   // se desactivó mientras pedíamos
       stream = s;
       ctx = new (window.AudioContext || window.webkitAudioContext)();
       var src = ctx.createMediaStreamSource(stream);
@@ -70,18 +72,24 @@
       src.connect(analyser);
       running = true; peaks = []; prevQuiet = true;
       loop();
-      if (window.APP) window.APP.addMsg("Escucha de palmadas activada, señor. 👏👏 = música.", "sys");
+      if (announce && window.APP) window.APP.addMsg("Escucha de palmadas activada, señor. 👏👏 = música.", "sys");
     }).catch(function () {
-      if (window.APP) window.APP.addMsg("Necesito permiso de micrófono para las palmadas, señor.", "sys");
+      if (announce && window.APP) window.APP.addMsg("Necesito permiso de micrófono para las palmadas, señor.", "sys");
     });
   }
-
-  function stop() {
+  function release() {
     running = false;
     if (raf) cancelAnimationFrame(raf);
     if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
     if (ctx) { try { ctx.close(); } catch (e) {} ctx = null; }
   }
+  function start() { wantRunning = true; acquire(true); }
+  function stop() { wantRunning = false; release(); }
+  // pause/resume: la VOZ (STT/wake) y la palmada NO pueden tener el micro a la vez en móvil.
+  // Cuando hablas, soltamos el micro; al terminar, lo recuperamos.
+  function pause() { release(); }
+  function resume() { if (wantRunning && !running) acquire(false); }
 
-  window.Clap = { start: start, stop: stop, isRunning: function () { return running; } };
+  window.Clap = { start: start, stop: stop, pause: pause, resume: resume,
+    isRunning: function () { return running; }, wants: function () { return wantRunning; } };
 })();

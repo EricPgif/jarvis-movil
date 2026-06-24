@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "4.1";
-  var WHATS_NEW = "Modo Super: ¡las apps GIRAN alrededor de la esfera Y se pueden tocar y arrastrar a la vez! Ya no hay «campo invisible»: arrastras hasta la papelera sin límite. Tope de 15 apps. Y el icono nuevo de Gmail.";
+  var APP_VERSION = "4.2";
+  var WHATS_NEW = "La VOZ vuelve a funcionar en modo normal Y en Modo Super (toca la esfera o di «Jarvis»). Las apps giran suaves, sin tirones. Y al abrir una app se abre SOLO la app, nunca la web. Logos nuevos: Steam, Epic Games, Cámara y Agenda.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──

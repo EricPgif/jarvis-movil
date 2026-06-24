@@ -58,9 +58,8 @@
       var ic = window.AppIcons ? window.AppIcons.html(a.name, a.domain) : "▣";   // logo real o pastilla
       b.innerHTML = '<span class="qi">' + ic + '</span><span class="ql">' + esc(a.name.slice(0, 9)) + '</span>';
       b.addEventListener("click", function () {
-        var t = a.url || a.web;
-        if (window.Links) window.Links.open(t, a.web || (/^https?:/.test(t) ? t : null));
-        else window.location.href = t;
+        if (window.Links && window.Links.openDirect) window.Links.openDirect({ android: a.android || pkgFor(a.name), scheme: a.scheme, url: a.url, web: a.web });
+        else { var t = a.url || a.web; window.location.href = t; }
       });
       dock.appendChild(b);
     });
@@ -138,6 +137,27 @@
   ];
   // Apps FIJAS del dock (predeterminadas): no se pueden añadir de nuevo (evita un 2º Gmail, etc.).
   var DEFAULT_APPS = ["spotify", "youtube", "whatsapp", "telegram", "chrome", "gmail", "navegador", "calendario", "agenda"];
+
+  // Package de Android por app (para abrir SOLO la app, nunca la web). De los agentes + verificado.
+  var PKG = {
+    spotify: "com.spotify.music", youtube: "com.google.android.youtube", whatsapp: "com.whatsapp",
+    telegram: "org.telegram.messenger", instagram: "com.instagram.android", tiktok: "com.zhiliaoapp.musically",
+    x: "com.twitter.android", facebook: "com.facebook.katana", discord: "com.discord", reddit: "com.reddit.frontpage",
+    twitch: "tv.twitch.android.app", pinterest: "com.pinterest", snapchat: "com.snapchat.android",
+    netflix: "com.netflix.mediaclient", alexa: "com.amazon.dee.app", amazon: "com.amazon.mShop.android.shopping",
+    steam: "com.valvesoftware.android.steam.community", "epic games": "com.epicgames.portal", chatgpt: "com.openai.chatgpt",
+    canva: "com.canva.editor", gemini: "com.google.android.apps.bard", gmail: "com.google.android.gm",
+    drive: "com.google.android.apps.docs", maps: "com.google.android.apps.maps", fotos: "com.google.android.apps.photos",
+    calendar: "com.google.android.calendar", traductor: "com.google.android.apps.translate",
+    google: "com.google.android.googlequicksearchbox", chrome: "com.android.chrome",
+    "proton mail": "ch.protonmail.android", "proton vpn": "ch.protonvpn.android", revolut: "com.revolut.revolut",
+    yuka: "io.yuka.android", "meta horizon": "com.oculus.twilight", "play store": "com.android.vending",
+    "google one": "com.google.android.apps.subscriptions.red", lens: "com.google.ar.lens",
+    meet: "com.google.android.apps.tachyon", keep: "com.google.android.keep", "google tv": "com.google.android.videos",
+    wallet: "com.google.android.apps.walletnfcrel", "mi fitness": "com.xiaomi.wearable", booking: "com.booking",
+    paypal: "com.paypal.android.p2pmobile",
+  };
+  function pkgFor(name) { return PKG[String(name || "").toLowerCase().trim()] || ""; }
   function renderSuggest() {
     var box = $("app-suggest"); if (!box) return;
     var have = {}; getApps().forEach(function (a) { have[a.name.toLowerCase()] = 1; });
@@ -158,7 +178,7 @@
   }
   window.Extras = {
     init: init, renderDock: renderDock,
-    getApps: getApps, setApps: setApps, catalog: COMMON, defaults: DEFAULT_APPS,
+    getApps: getApps, setApps: setApps, catalog: COMMON, defaults: DEFAULT_APPS, pkgFor: pkgFor,
     refresh: function () { renderApps(); renderSuggest(); renderDock(); },
   };
 })();

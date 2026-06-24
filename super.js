@@ -30,7 +30,10 @@
   function openDesc(d) {
     if (d.cam) { var c = $("cam"); if (c) c.click(); return null; }
     if (d.app) return window.Links.openApp(d.app);
-    return window.Links.open(d.url || d.web, d.web || (/^https?:/.test(d.url) ? d.url : null));
+    var pkg = (window.Extras && window.Extras.pkgFor) ? window.Extras.pkgFor(d.name) : "";
+    if (window.Links && window.Links.openDirect) window.Links.openDirect({ android: d.android || pkg, scheme: d.scheme, url: d.url, web: d.web });
+    else window.Links.open(d.url || d.web, d.web);
+    return "Abriendo " + d.name + ", señor.";
   }
   function iconFor(a) { return window.AppIcons ? window.AppIcons.html(a.name, a.domain) : esc(a.name.charAt(0)); }
   function getPos() { try { return JSON.parse(localStorage.getItem("super_pos") || "{}") || {}; } catch (e) { return {}; } }
@@ -193,8 +196,8 @@
       ORBIT.tiles.forEach(function (t) {
         if (t.dragging) return;
         var a = (t.baseAng + ORBIT.rot) * Math.PI / 180;
-        t.el.style.setProperty("--x", Math.round(Math.cos(a) * R) + "px");
-        t.el.style.setProperty("--y", Math.round(Math.sin(a) * R) + "px");
+        t.el.style.setProperty("--x", (Math.cos(a) * R).toFixed(2) + "px");   // sin redondear → giro fluido
+        t.el.style.setProperty("--y", (Math.sin(a) * R).toFixed(2) + "px");
       });
       ORBIT.raf = requestAnimationFrame(frame);
     })();

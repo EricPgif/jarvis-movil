@@ -96,7 +96,7 @@
       listening = false; if (_onState) _onState(false);
       if (_onResult) _onResult(t);
     };
-    rec.onend = function () { clearGuard(); listening = false; if (_onState) _onState(false); };
+    rec.onend = function () { clearGuard(); listening = false; if (_onState) _onState(false); try { if (window.Clap) window.Clap.resume(); } catch (e) {} };
     rec.onerror = function (e) {
       clearGuard(); listening = false; if (_onState) _onState(false);
       if (_onError) _onError((e && e.error) || "error");
@@ -108,6 +108,7 @@
     if (!rec) return { ok: false, reason: "no-stt" };
     if (listening) { try { rec.stop(); } catch (e) {} return { ok: true, stopped: true }; }
     cancel();
+    try { if (window.Clap) window.Clap.pause(); } catch (e) {}   // suelta el micro de la palmada para poder escuchar
     try {
       rec.start(); listening = true; if (onState) onState(true);
       // Anti-cuelgue: si en 10 s no llega resultado ni fin (pasa en algunos móviles/PWA
@@ -144,6 +145,7 @@
   function startWake(onCommand, onState) {
     if (!wrec) { if (onState) onState("unsupported"); return false; }
     _onCmd = onCommand; _onWS = onState; wakeOn = true; capturing = false;
+    try { if (window.Clap) window.Clap.pause(); } catch (e) {}   // el wake necesita el micro en exclusiva
     wrec.onresult = function (e) {
       var r = e.results[e.results.length - 1];
       var t = wnorm(r[0].transcript);
@@ -159,7 +161,7 @@
     wstart();
     return true;
   }
-  function stopWake() { wakeOn = false; capturing = false; if (wrec) { try { wrec.onend = null; wrec.onresult = null; wrec.abort(); } catch (e) {} } }
+  function stopWake() { wakeOn = false; capturing = false; if (wrec) { try { wrec.onend = null; wrec.onresult = null; wrec.abort(); } catch (e) {} } try { if (window.Clap) window.Clap.resume(); } catch (e) {} }
   function wakeCapture() { if (!wrec) return false; capturing = true; if (_onWS) _onWS("listening"); wstart(); return true; }  // clic esfera
 
   window.Voice = {

@@ -15,26 +15,25 @@
 
   // Apps por nombre ("abre X"). scheme = deep link nativo; https = respaldo web.
   var APPS = {
-    spotify:    { frase: "Abriendo Spotify, señor.",   scheme: "spotify:",                 https: "https://open.spotify.com" },
-    youtube:    { frase: "Abriendo YouTube, señor.",   https: "https://www.youtube.com" },
+    spotify:    { frase: "Abriendo Spotify, señor.",   android: "com.spotify.music", scheme: "spotify:",   https: "https://open.spotify.com" },
+    youtube:    { frase: "Abriendo YouTube, señor.",   android: "com.google.android.youtube", https: "https://www.youtube.com" },
     whatsapp:   { frase: "Abriendo WhatsApp, señor.",  scheme: "whatsapp://", android: "com.whatsapp",            intentScheme: "whatsapp", appOnly: true },
     telegram:   { frase: "Abriendo Telegram, señor.",  scheme: "tg://",           android: "org.telegram.messenger", intentScheme: "tg",       appOnly: true },
     gmail:      { frase: "Abriendo Gmail, señor.", scheme: "googlegmail://", android: "com.google.android.gm", appOnly: true },
     correo:     { frase: "Abriendo Gmail, señor.", scheme: "googlegmail://", android: "com.google.android.gm", appOnly: true },
-    calendario: { frase: "Abriendo tu calendario, señor.", https: "https://calendar.google.com" },
-    navegador:  { frase: "Abriendo el navegador, señor.",  https: "https://www.google.com" },
-    chrome:     { frase: "Abriendo Chrome, señor.",  scheme: "googlechrome://", https: "https://www.google.com" },
+    calendario: { frase: "Abriendo tu calendario, señor.", android: "com.google.android.calendar", https: "https://calendar.google.com" },
+    navegador:  { frase: "Abriendo Chrome, señor.",  android: "com.android.chrome", scheme: "googlechrome://", https: "https://www.google.com" },
+    chrome:     { frase: "Abriendo Chrome, señor.",  android: "com.android.chrome", scheme: "googlechrome://", https: "https://www.google.com" },
     clima:      { frase: "Aquí tiene el tiempo, señor.",   https: "https://www.google.com/search?q=el+tiempo+hoy" },
-    netflix:    { frase: "Abriendo Netflix, señor.",   https: "https://www.netflix.com" },
-    // Apps comunes (intenta la app y, si no está, cae a la web).
-    discord:    { frase: "Abriendo Discord, señor.",   scheme: "discord://",    https: "https://discord.com/app" },
-    instagram:  { frase: "Abriendo Instagram, señor.", scheme: "instagram://",  https: "https://instagram.com" },
-    tiktok:     { frase: "Abriendo TikTok, señor.",    scheme: "snssdk1233://", https: "https://www.tiktok.com" },
-    twitter:    { frase: "Abriendo X, señor.",         scheme: "twitter://",    https: "https://x.com" },
-    reddit:     { frase: "Abriendo Reddit, señor.",    scheme: "reddit://",     https: "https://reddit.com" },
-    twitch:     { frase: "Abriendo Twitch, señor.",    scheme: "twitch://",     https: "https://twitch.tv" },
-    maps:       { frase: "Abriendo Maps, señor.",      scheme: "geo:0,0",       https: "https://maps.google.com" },
-    mapas:      { frase: "Abriendo Maps, señor.",      scheme: "geo:0,0",       https: "https://maps.google.com" },
+    netflix:    { frase: "Abriendo Netflix, señor.",   android: "com.netflix.mediaclient", https: "https://www.netflix.com" },
+    discord:    { frase: "Abriendo Discord, señor.",   android: "com.discord", scheme: "discord://",    https: "https://discord.com/app" },
+    instagram:  { frase: "Abriendo Instagram, señor.", android: "com.instagram.android", scheme: "instagram://",  https: "https://instagram.com" },
+    tiktok:     { frase: "Abriendo TikTok, señor.",    android: "com.zhiliaoapp.musically", scheme: "snssdk1233://", https: "https://www.tiktok.com" },
+    twitter:    { frase: "Abriendo X, señor.",         android: "com.twitter.android", scheme: "twitter://",    https: "https://x.com" },
+    reddit:     { frase: "Abriendo Reddit, señor.",    android: "com.reddit.frontpage", scheme: "reddit://",     https: "https://reddit.com" },
+    twitch:     { frase: "Abriendo Twitch, señor.",    android: "tv.twitch.android.app", scheme: "twitch://",     https: "https://twitch.tv" },
+    maps:       { frase: "Abriendo Maps, señor.",      android: "com.google.android.apps.maps", scheme: "geo:0,0",       https: "https://maps.google.com" },
+    mapas:      { frase: "Abriendo Maps, señor.",      android: "com.google.android.apps.maps", scheme: "geo:0,0",       https: "https://maps.google.com" },
   };
 
   // Funciones solo-PC: no se pueden en el móvil. Mensaje honesto.
@@ -90,16 +89,19 @@
     }
   }
 
+  // Abre un descriptor {android, scheme, web/https, url, appOnly}. En Android, si hay PACKAGE,
+  // lanza la APP por su launcher (SOLO app, nunca web). Si no, scheme y, si toca, respaldo web.
+  function openDirect(d) {
+    if (!d) return;
+    var fb = d.web || d.https || (/^https?:/i.test(d.url || "") ? d.url : "");
+    if (isAndroid() && d.android) { openAndroidIntent(d); return; }   // la APP directa
+    if (d.scheme) { open(d.scheme, d.appOnly ? null : fb); return; }
+    open((/^https?:/i.test(d.url || "") ? d.url : "") || fb, fb);
+  }
   function openApp(key) {
     var a = APPS[key];
     if (!a) return null;
-    if (a.appOnly) {
-      // SOLO la app, nunca la web.
-      if (isAndroid() && a.android) openAndroidIntent(a);   // intent (lo más fiable en Android/MIUI)
-      else if (a.scheme) { try { window.location.href = a.scheme; } catch (e) {} }   // iOS u otros: scheme puro
-    } else {
-      open(a.scheme || a.https, a.https);
-    }
+    openDirect(a);
     lastAppKey = key; try { localStorage.setItem("mm_last_app", key); } catch (e) {}
     return a.frase;
   }
@@ -125,6 +127,6 @@
     return PC_ONLY.some(function (w) { return text.indexOf(w) !== -1; });
   }
 
-  window.Links = { open: open, openApp: openApp, openNamed: openNamed, searchMusic: searchMusic,
-                   reopenLast: reopenLast, isPcOnly: isPcOnly, APPS: APPS, NAMED: NAMED, CLAP: NAMED.clap };
+  window.Links = { open: open, openApp: openApp, openDirect: openDirect, openNamed: openNamed, searchMusic: searchMusic,
+                   reopenLast: reopenLast, isAndroid: isAndroid, isPcOnly: isPcOnly, APPS: APPS, NAMED: NAMED, CLAP: NAMED.clap };
 })();
