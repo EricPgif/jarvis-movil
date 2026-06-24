@@ -18,16 +18,32 @@
     "tú mismo (tu conocimiento llega hasta 2026). Estás en su móvil: puedes conversar, abrir " +
     "apps del teléfono y ayudar, pero no controlas su PC desde aquí.";
 
-  // MEMORIA: el historial se GUARDA en el móvil (localStorage) y se restaura al abrir,
-  // así JARVIS recuerda la conversación (tu nombre, tu color favorito…) como en el PC.
-  function loadHist() {
-    try { var h = JSON.parse(localStorage.getItem("mm_history") || "[]"); return Array.isArray(h) ? h : []; }
-    catch (e) { return []; }
+  // ── CONVERSACIONES: varias, con nombre (como en Claude). Cada una con su historial. Los HECHOS
+  //    sobre Eric ([[Mem]], mm_facts) son GLOBALES: no se pierden al cambiar de conversación. ──
+  function genId() { return "c" + Math.random().toString(36).slice(2, 9); }
+  function loadStore() {
+    try {
+      var raw = JSON.parse(localStorage.getItem("mm_convos") || "null");
+      if (raw && raw.convos && raw.convos.length) return raw;
+    } catch (e) {}
+    // Migración del historial único antiguo (mm_history) → primera conversación.
+    var old = [];
+    try { var h = JSON.parse(localStorage.getItem("mm_history") || "[]"); if (h && h.length) old = h; } catch (e) {}
+    var id = genId();
+    return { active: id, convos: [{ id: id, name: "Conversación 1", history: old }] };
   }
-  function saveHist() {
-    try { localStorage.setItem("mm_history", JSON.stringify(history.slice(-30))); } catch (e) {}
+  var STORE = loadStore();
+  function saveStore() { try { localStorage.setItem("mm_convos", JSON.stringify(STORE)); } catch (e) {} }
+  function active() {
+    for (var i = 0; i < STORE.convos.length; i++) if (STORE.convos[i].id === STORE.active) return STORE.convos[i];
+    STORE.active = STORE.convos[0].id; return STORE.convos[0];
   }
-  var history = loadHist();   // [{role, content}]
+  function H() { return active().history; }          // historial de la conversación ACTIVA
+  function saveHist() {                              // recorta a 30 EN SITIO (mantiene referencia) + guarda
+    var c = active();
+    if (c.history.length > 30) c.history.splice(0, c.history.length - 30);
+    saveStore();
+  }
 
   // ── Cerebro: personalidad brillante + natural, y CONTEXTO real de ahora ──
   var BASE_PROMPT = [
@@ -169,9 +185,9 @@
   // tipo "Buscando en la web…". Máx 3 rondas de herramienta para no encadenar sin fin.
   function askMiniMax(userText, onStatus) {
     if (!CFG.key) return Promise.reject(new Error("sin key"));
-    history.push({ role: "user", content: userText });
-    if (history.length > 30) history = history.slice(-30);
-    var messages = history.slice();   // copia de trabajo (crece con bloques de herramienta)
+    H().push({ role: "user", content: userText });
+    saveHist();
+    var messages = H().slice();   // copia de trabajo (crece con bloques de herramienta)
     function loop(depth) {
       return callMiniMax(messages).then(function (data) {
         var blocks = data.content || [];
@@ -205,12 +221,12 @@
             })
             .catch(function () {
               var t = cleanText(blocks) || "No pude buscar ahora mismo, señor.";
-              history.push({ role: "assistant", content: t }); saveHist(); return t;
+              H().push({ role: "assistant", content: t }); saveHist(); return t;
             });
         }
         var txt = cleanText(blocks);
         if (!txt) txt = "A su servicio, señor.";   // si solo había markup, no dejes el globo vacío
-        history.push({ role: "assistant", content: txt });
+        H().push({ role: "assistant", content: txt });
         saveHist();   // recordar la conversación (memoria)
         return txt;
       });
@@ -222,16 +238,44 @@
   // MiniMax tenga contexto en lo siguiente ("abre WhatsApp" → "vuelve a abrirlo").
   function addExchange(userText, assistantText) {
     if (!userText) return;
-    history.push({ role: "user", content: String(userText) });
-    history.push({ role: "assistant", content: String(assistantText || "") });
-    if (history.length > 30) history = history.slice(-30);
+    H().push({ role: "user", content: String(userText) });
+    H().push({ role: "assistant", content: String(assistantText || "") });
     saveHist();
+  }
+
+  // ── API de conversaciones ──
+  function listConvos() {
+    return STORE.convos.map(function (c) {
+      return { id: c.id, name: c.name, active: c.id === STORE.active, count: c.history.length };
+    });
+  }
+  function newConvo(name) {
+    var c = { id: genId(), name: (name || "").trim() || ("Conversación " + (STORE.convos.length + 1)), history: [] };
+    STORE.convos.push(c); STORE.active = c.id; saveStore(); return c.id;
+  }
+  function switchConvo(id) {
+    for (var i = 0; i < STORE.convos.length; i++) if (STORE.convos[i].id === id) { STORE.active = id; saveStore(); return true; }
+    return false;
+  }
+  function renameConvo(id, name) {
+    name = (name || "").trim(); if (!name) return;
+    for (var i = 0; i < STORE.convos.length; i++) if (STORE.convos[i].id === id) { STORE.convos[i].name = name.slice(0, 40); saveStore(); return; }
+  }
+  function deleteConvo(id) {
+    STORE.convos = STORE.convos.filter(function (c) { return c.id !== id; });
+    if (!STORE.convos.length) STORE.convos.push({ id: genId(), name: "Conversación 1", history: [] });
+    if (!STORE.convos.some(function (c) { return c.id === STORE.active; })) STORE.active = STORE.convos[0].id;
+    saveStore();
   }
 
   window.CFG = CFG;
   window.API = {
     askMiniMax: askMiniMax, SYSTEM: SYSTEM, addExchange: addExchange,
-    getHistory: function () { return history.slice(); },     // para mostrar el chat pasado
-    clearHistory: function () { history = []; try { localStorage.removeItem("mm_history"); } catch (e) {} },
+    getHistory: function () { return H().slice(); },     // para mostrar el chat pasado
+    clearHistory: function () { active().history.length = 0; saveStore(); },   // limpia SOLO la conversación activa
+    // conversaciones
+    listConvos: listConvos, newConvo: newConvo, switchConvo: switchConvo,
+    renameConvo: renameConvo, deleteConvo: deleteConvo,
+    activeName: function () { return active().name; },
   };
 })();

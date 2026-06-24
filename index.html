@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="manifest" href="manifest.json?v=22" />
+<link rel="manifest" href="manifest.json?v=23" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 <style>
   :root{
@@ -94,6 +94,22 @@
   .ico-btn:active{background:var(--cyan-glow); transform:scale(.93);}
   .ico-btn.mic.on{background:var(--green); color:#022; border-color:var(--green); box-shadow:0 0 14px rgba(0,255,136,.5);}
 
+  /* ── Barra de conversación (visible, no enterrada en Ajustes) ── */
+  .convo-bar{display:flex; align-items:center; gap:6px; padding:4px 12px 2px; flex:0 0 auto;}
+  .cv-current{flex:1; min-width:0; display:flex; align-items:center; gap:7px; padding:6px 10px; border-radius:10px; border:1px solid var(--border); background:var(--card);}
+  .cv-current .cv-ic{color:var(--cyan); font-size:13px;}
+  .cv-current #cv-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; color:var(--text); font-size:12.5px;}
+  .cv-current .cv-caret{color:var(--cyan); font-size:10px;}
+  .cv-current:active{border-color:var(--cyan);}
+  .cv-act{flex:0 0 auto; width:36px; height:33px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--cyan); font-size:15px;}
+  .cv-act:active{background:var(--cyan-soft); transform:scale(.93);}
+  .cv-row{display:flex; align-items:center; gap:8px; padding:9px 11px; margin-bottom:7px; border-radius:11px; border:1px solid var(--border); background:var(--card);}
+  .cv-row.on{border-color:var(--cyan); background:var(--cyan-soft);}
+  .cv-row .cv-pick{flex:1; min-width:0; text-align:left; background:transparent; border:0; color:var(--text); font-size:14px; overflow:hidden;}
+  .cv-row .cv-pick small{display:block; color:var(--text-muted); font-size:11px; margin-top:2px;}
+  .cv-row .cv-edit,.cv-row .cv-del{flex:0 0 auto; width:32px; height:32px; border-radius:9px; border:1px solid var(--border); background:transparent; font-size:13px;}
+  .cv-row .cv-edit{color:var(--cyan);} .cv-row .cv-del{color:var(--red);}
+
   /* estado del cuerpo (esfera reactiva) — bordes */
   body.sp-listening{box-shadow:inset 0 0 60px rgba(0,255,136,.12);}
   body.sp-speaking{box-shadow:inset 0 0 60px rgba(0,212,255,.14);}
@@ -177,6 +193,14 @@
     <button class="qbtn" data-cam="1"><span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="1.6" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13.3" r="3.3"/></svg></span><span class="ql">Cámara</span></button>
   </div>
 
+  <div class="convo-bar">
+    <button class="cv-current" id="cv-open" aria-label="Cambiar de conversación">
+      <span class="cv-ic">💬</span><span id="cv-name">Conversación</span><span class="cv-caret">▾</span>
+    </button>
+    <button class="cv-act" id="cv-new" aria-label="Nueva conversación">＋</button>
+    <button class="cv-act" id="cv-clear" aria-label="Limpiar esta conversación">🗑</button>
+  </div>
+
   <div class="log" id="log"></div>
 
   <div class="bar">
@@ -251,21 +275,32 @@
     </div>
   </div>
 
-  <script src="sfx.js?v=22"></script>
-  <script src="sphere.js?v=22"></script>
-  <script src="memory.js?v=22"></script>
-  <script src="api.js?v=22"></script>
-  <script src="edgetts.js?v=22"></script>
-  <script src="pcvoice.js?v=22"></script>
-  <script src="voice.js?v=22"></script>
-  <script src="deeplinks.js?v=22"></script>
-  <script src="weather.js?v=22"></script>
-  <script src="router.js?v=22"></script>
-  <script src="super.js?v=22"></script>
-  <script src="intro.js?v=22"></script>
-  <script src="clap.js?v=22"></script>
-  <script src="standby.js?v=22"></script>
-  <script src="extras.js?v=22"></script>
-  <script src="movil.js?v=22"></script>
+  <!-- Conversaciones -->
+  <div class="modal" id="convo-modal">
+    <div class="sheet">
+      <button class="sheet-x" id="cv-x" aria-label="Cerrar">✕</button>
+      <h2>Conversaciones</h2>
+      <p>Una por tema (como en Claude). Lo que sé de ti se conserva en todas.</p>
+      <button class="full" id="cv-add" style="background:var(--cyan);color:#022;border:0;font-weight:700">＋ Nueva conversación</button>
+      <div id="convo-list" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+  <script src="sfx.js?v=23"></script>
+  <script src="sphere.js?v=23"></script>
+  <script src="memory.js?v=23"></script>
+  <script src="api.js?v=23"></script>
+  <script src="edgetts.js?v=23"></script>
+  <script src="pcvoice.js?v=23"></script>
+  <script src="voice.js?v=23"></script>
+  <script src="deeplinks.js?v=23"></script>
+  <script src="weather.js?v=23"></script>
+  <script src="router.js?v=23"></script>
+  <script src="super.js?v=23"></script>
+  <script src="intro.js?v=23"></script>
+  <script src="clap.js?v=23"></script>
+  <script src="standby.js?v=23"></script>
+  <script src="extras.js?v=23"></script>
+  <script src="movil.js?v=23"></script>
 </body>
 </html>

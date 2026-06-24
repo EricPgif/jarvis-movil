@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "3.2";
-  var WHATS_NEW = "Ahora el agente BUSCA solo (sin pedir permiso) cuando preguntas por algo reciente. E iconos de las apps con su logo (Spotify, YouTube, WhatsApp, Telegram…).";
+  var APP_VERSION = "3.3";
+  var WHATS_NEW = "¡Varias conversaciones con nombre, como en Claude! Barra arriba del chat para cambiar, crear (＋) y limpiar (🗑) — ya no hay que entrar en Ajustes. Lo que sé de ti se conserva en todas.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -98,11 +98,43 @@
     Voice.speak(text, null, function () { setState(""); });
   }
 
-  // Borra la conversación (chat normal + Super) PERO conserva los hechos de Eric (mm_facts).
+  // Borra la conversación ACTIVA (chat normal + Super) PERO conserva los hechos de Eric (mm_facts).
   function clearChat() {
     if (window.API && window.API.clearHistory) window.API.clearHistory();
     $("log").innerHTML = ""; var sl = $("super-log"); if (sl) sl.innerHTML = "";
     addMsg("Conversación borrada, señor. Sigo recordando lo importante de usted.", "sys");
+  }
+
+  // ── Conversaciones (varias, con nombre) ──
+  function updateConvoName() { var el = $("cv-name"); if (el && window.API && API.activeName) el.textContent = API.activeName(); }
+  function renderHistory(welcomeIfEmpty) {
+    $("log").innerHTML = ""; var sl = $("super-log"); if (sl) sl.innerHTML = "";
+    var hist = (window.API && API.getHistory) ? API.getHistory() : [];
+    if (hist.length) hist.forEach(function (m) { addMsg(m.content, m.role === "user" ? "me" : "jv"); });
+    else addMsg(welcomeIfEmpty || "Nueva conversación, señor. ¿En qué le ayudo?", "jv");
+    updateConvoName();
+  }
+  function openConvos() { renderConvoList(); $("convo-modal").classList.add("show"); }
+  function closeConvos() { $("convo-modal").classList.remove("show"); }
+  function newConversation() { if (window.API) API.newConvo(); renderHistory(); closeConvos(); }
+  function renderConvoList() {
+    var box = $("convo-list"); if (!box || !window.API) return;
+    box.innerHTML = API.listConvos().map(function (c) {
+      return '<div class="cv-row' + (c.active ? " on" : "") + '">' +
+        '<button class="cv-pick" data-id="' + c.id + '">' + escapeHtml(c.name) +
+        '<small>' + Math.floor(c.count / 2) + ' mensajes</small></button>' +
+        '<button class="cv-edit" data-id="' + c.id + '" aria-label="Renombrar">✎</button>' +
+        '<button class="cv-del" data-id="' + c.id + '" aria-label="Borrar">🗑</button></div>';
+    }).join("");
+    Array.prototype.forEach.call(box.querySelectorAll(".cv-pick"), function (b) {
+      b.addEventListener("click", function () { API.switchConvo(b.dataset.id); renderHistory(); closeConvos(); });
+    });
+    Array.prototype.forEach.call(box.querySelectorAll(".cv-edit"), function (b) {
+      b.addEventListener("click", function () { var n = prompt("Nombre de la conversación:"); if (n) { API.renameConvo(b.dataset.id, n); renderConvoList(); updateConvoName(); } });
+    });
+    Array.prototype.forEach.call(box.querySelectorAll(".cv-del"), function (b) {
+      b.addEventListener("click", function () { if (confirm("¿Borrar esta conversación, señor?")) { API.deleteConvo(b.dataset.id); renderConvoList(); renderHistory(); } });
+    });
   }
 
   // ── Voz (micro) ──
@@ -238,6 +270,12 @@
     $("cfg-install").addEventListener("click", doInstall);
     $("cfg-update").addEventListener("click", forceUpdate);
     $("cfg-clear").addEventListener("click", function () { closeSettings(); clearChat(); });
+    // Conversaciones
+    $("cv-open").addEventListener("click", openConvos);
+    $("cv-new").addEventListener("click", newConversation);
+    $("cv-clear").addEventListener("click", clearChat);
+    $("cv-x").addEventListener("click", closeConvos);
+    $("cv-add").addEventListener("click", newConversation);
     $("cfg-sfx").addEventListener("click", function () {
       if (!window.sfx) return;
       var on = !window.sfx.enabled; window.sfx.setEnabled(on);
@@ -355,6 +393,7 @@
       } else {
         addMsg("J.A.R.V.I.S. a su servicio, señor. Hábleme o escriba.", "jv");
       }
+      updateConvoName();
     }
     if (window.Standby && window.Standby.start) window.Standby.start();   // espera tras 2 min sin tocar
     if (window.Intro && window.Intro.play) window.Intro.play(start);
