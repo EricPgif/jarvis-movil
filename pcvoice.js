@@ -3,7 +3,13 @@
    voz que el JARVIS del PC. Si falla, voice.js usa la voz del sistema. Expone window.PCVoice. */
 (function () {
   "use strict";
-  function base() { return (localStorage.getItem("mm_tts_worker") || "").replace(/\/+$/, ""); }
+  // Worker de Eric ya desplegado: voz AlvaroNeural por defecto, sin pegar nada.
+  // Si en Ajustes pones otra URL, esa manda; deja el campo vacío para volver a esta.
+  var DEFAULT_WORKER = "https://rapid-sky-2af7.ericponceal.workers.dev";
+  function base() {
+    var saved = (localStorage.getItem("mm_tts_worker") || "").trim();
+    return (saved || DEFAULT_WORKER).replace(/\/+$/, "");
+  }
   var audio = null;
 
   var PC = {

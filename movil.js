@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "2.5";
-  var WHATS_NEW = "Clima por tu ubicación real (GPS), WhatsApp/Telegram abren solo en su app, y «Mis Apps» con lista para elegir.";
+  var APP_VERSION = "2.6";
+  var WHATS_NEW = "¡La voz del PC (Álvaro) ya suena en el móvil! Generada en la nube, automática y sin configurar nada.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
