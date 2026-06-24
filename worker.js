@@ -6,7 +6,8 @@
    ───────────────────────────────────────────────────────────────────────── */
 
 const TRUSTED_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
-const WSS = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1";
+// Cloudflare Workers exige http(s):// en fetch para el upgrade a WebSocket (no acepta wss://).
+const WSS = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1";
 const GEC_VERSION = "1-130.0.2849.68";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
