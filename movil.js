@@ -7,8 +7,9 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "2.1";
-  var WHATS_NEW = "JARVIS más inteligente y natural: responde como una IA top, sabe la fecha/hora/clima de ahora y conversa mejor.";
+  var APP_VERSION = "2.2";
+  var WHATS_NEW = "Sin letras chinas, la voz ya no lee símbolos, Modo Super (chat escribe + esfera grande + botones bien) y versión visible en la intro.";
+  window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
   function addMsg(text, cls) {
@@ -24,8 +25,15 @@
       var c = d.cloneNode(true);
       slog.appendChild(c);
       slog.scrollTop = slog.scrollHeight;
+      d._mirror = c;   // para poder actualizar también el clon del Super (bug del "...")
     }
     return d;
+  }
+  // Actualiza el texto de un mensaje Y su clon en el chat del Super.
+  function setMsg(el, text) {
+    if (!el) return;
+    el.textContent = text;
+    if (el._mirror) el._mirror.textContent = text;
   }
   function setState(s) {   // '', 'listening', 'speaking', 'thinking'
     Sphere.setMode(s === "thinking" ? "processing" : (s || "idle"));
@@ -53,13 +61,13 @@
     setState("thinking");
     var thinking = addMsg("…", "jv");
     API.askMiniMax(text).then(function (reply) {
-      thinking.textContent = reply || "(sin respuesta)";
+      setMsg(thinking, reply || "(sin respuesta)");
       $("log").scrollTop = $("log").scrollHeight;
+      var sl = $("super-log"); if (sl) sl.scrollTop = sl.scrollHeight;
       busy = false;
       speak(reply);
     }).catch(function (e) {
-      thinking.textContent = "Error: " + (e.message || e);
-      thinking.classList.add("sys");
+      setMsg(thinking, "Error: " + (e.message || e));
       busy = false; setState("");
     });
   }

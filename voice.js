@@ -42,10 +42,26 @@
       speechSynthesis.speak(u);
     } catch (e) { if (onend) onend(); }
   }
+  // Texto 'hablable': quita markdown/símbolos/CJK/emojis para que la voz NO los pronuncie
+  // (no afecta a lo que se MUESTRA). Deja . , ? ! ¿ ¡ (el motor los hace pausa, no los dice).
+  function cleanForTTS(text) {
+    if (!text) return "";
+    var t = String(text);
+    t = t.replace(/```[\s\S]*?```/g, " ");                 // bloques de código
+    t = t.replace(/`[^`]*`/g, " ");                         // código en línea
+    t = t.replace(/https?:\/\/\S+/g, " ");                  // URLs
+    t = t.replace(/J\.A\.R\.V\.I\.S\.?/g, "Jarvis");
+    t = t.replace(/[#>*_~|^=]+/g, " ");                     // markdown que se pronuncia (asterisco…)
+    t = t.replace(/[　-〿぀-ヿ㐀-䶿一-鿿가-힯豈-﫿＀-￯]/g, " ");  // CJK por si acaso
+    try { t = t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/gu, " "); } catch (e) {} // emojis
+    t = t.replace(/\s{2,}/g, " ").trim();
+    return t;
+  }
   function speak(text, onstart, onend) {
     if (!text) { if (onend) onend(); return; }
     cancel();
-    var clean = String(text).replace(/J\.A\.R\.V\.I\.S\.?/g, "Jarvis");
+    var clean = cleanForTTS(text);
+    if (!clean) { if (onend) onend(); return; }
     // 1) Voz JARVIS de las pelis (edge-tts AlvaroNeural). Si falla antes de sonar, voz del sistema.
     if (window.EdgeTTS && window.EdgeTTS.available) {
       var begun = false;

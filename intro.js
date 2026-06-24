@@ -39,6 +39,7 @@
   .intro-ic{width:clamp(42px,12vw,54px);height:clamp(42px,12vw,54px);border-radius:15px;border:1px solid var(--border-hi);background:rgba(10,23,38,.85);
     color:var(--cyan);display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 0 16px rgba(0,212,255,.2);opacity:0;}
   .intro-skip{position:absolute;bottom:calc(8px + env(safe-area-inset-bottom));left:0;right:0;text-align:center;font-size:10px;letter-spacing:2px;color:var(--text-muted);opacity:.7;}
+  .intro-ver{position:absolute;bottom:calc(30px + env(safe-area-inset-bottom));left:0;right:0;text-align:center;font-size:10px;letter-spacing:2px;color:var(--text-dim);opacity:.85;}
   `;
 
   var played = false;
@@ -59,7 +60,10 @@
       '<div class="intro-sub">JUST A RATHER VERY INTELLIGENT SYSTEM</div>' +
       '<div class="intro-clock" id="intro-clock">--:--</div>' +
       '<div class="intro-dock" id="intro-dock"></div>' +
+      '<div class="intro-ver" id="intro-ver">JARVIS · v' + (window.JV_VERSION || "?") + ' · comprobando actualización…</div>' +
       '<div class="intro-skip">toca para saltar</div>';
+    // Tras un momento, deja solo la versión (la actualización, si la hay, la aplica el SW solo).
+    setTimeout(function () { var v = document.getElementById("intro-ver"); if (v) v.textContent = "JARVIS · v" + (window.JV_VERSION || "?"); }, 1800);
     v.style.display = "block";
     v.classList.add("show");
 

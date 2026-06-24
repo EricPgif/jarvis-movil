@@ -31,6 +31,7 @@
     "  digas solo 'no lo se': razona, explica, aconseja y da tu mejor respuesta como una IA de primer nivel.",
     "- Habla NATURAL y conversacional: charla, opina, bromea si encaja, da consejos. Sin relleno, pero",
     "  tampoco respuestas secas; el punto justo. Sin emojis. Espanol de Espana.",
+    "- Escribe SIEMPRE en alfabeto latino. NUNCA uses caracteres chinos, japoneses ni coreanos.",
     "",
     "QUE PUEDES HACER EN ESTE MOVIL (dilo con naturalidad si viene a cuento):",
     "- Abrir apps del telefono: Spotify (musica), YouTube, WhatsApp, Telegram, correo, calendario,",
@@ -83,7 +84,10 @@
         }
         var txt = "";
         (data.content || []).forEach(function (bl) { if (bl && bl.type === "text") txt += (bl.text || ""); });
-        txt = txt.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "").trim();
+        txt = txt.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "");
+        // MiniMax a veces cuela caracteres chinos/japoneses/coreanos aunque hable español → fuera.
+        txt = txt.replace(/[　-〿぀-ヿ㐀-䶿一-鿿가-힯豈-﫿＀-￯]/g, "");
+        txt = txt.replace(/[ \t]{2,}/g, " ").trim();
         history.push({ role: "assistant", content: txt });
         return txt;
       });
