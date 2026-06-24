@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "3.9";
-  var WHATS_NEW = "Modo Super arreglado: ahora colocas cada app DONDE QUIERAS (la arrastras libre, sin amontonarse) y se queda; ya no «va raro». Y la DOBLE PALMADA por fin funciona (actívala en Ajustes 👏👏).";
+  var APP_VERSION = "4.0";
+  var WHATS_NEW = "Logos de verdad dibujados a mano (Fotos, Traductor, Play Store, Drive, Gemini, Wallet, Discord, Epic, Facebook…). Gmail abre la APP (no el navegador). Y en el Modo Super los logos van a TODO COLOR (se acabó el pegote azul).";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──

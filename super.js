@@ -79,9 +79,8 @@
   .sup-app.drag .si{transform:scale(1.2);border-color:var(--cyan);box-shadow:0 0 26px var(--cyan-glow);}
   .sup-app:active .si{transform:scale(.9);}
   .sup-app .sl{font-size:10px;color:var(--text-dim);letter-spacing:.3px;max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  /* Logos en AZUL HUD (mismo color que JARVIS) dentro del Super */
-  .sup-app .si svg,.sup-app .si img{filter:brightness(0) saturate(100%) invert(70%) sepia(60%) saturate(3200%) hue-rotate(155deg) brightness(104%) contrast(101%);}
-  .sup-app .si .lt{background:rgba(0,212,255,.16)!important;color:var(--cyan)!important;}
+  /* Logos a TODO COLOR (como en el dock) — fondo claro para que se vean bien */
+  .sup-app .si{background:#0c1826;}
   @keyframes supSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   #super-log{position:absolute;left:10px;right:10px;bottom:calc(96px + env(safe-area-inset-bottom));max-height:12vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;z-index:5;pointer-events:none;-webkit-mask-image:linear-gradient(transparent,#000 38%);mask-image:linear-gradient(transparent,#000 38%);}
   #super-log .msg{pointer-events:auto;max-width:86%;padding:8px 12px;border-radius:13px;font-size:14px;line-height:1.4;white-space:pre-wrap;word-break:break-word;}
