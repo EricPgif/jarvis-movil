@@ -62,10 +62,10 @@
     cancel();
     var clean = cleanForTTS(text);
     if (!clean) { if (onend) onend(); return; }
-    // 1) Voz JARVIS de las pelis (edge-tts AlvaroNeural). Si falla antes de sonar, voz del sistema.
-    if (window.EdgeTTS && window.EdgeTTS.available) {
+    // 1) Voz del PC (es-ES-AlvaroNeural) por el Worker. Si falla ANTES de sonar → voz del sistema.
+    if (window.PCVoice && window.PCVoice.available) {
       var begun = false;
-      window.EdgeTTS.speak(clean, function () { begun = true; if (onstart) onstart(); }, onend)
+      window.PCVoice.speak(clean, function () { begun = true; if (onstart) onstart(); }, onend)
         .catch(function () { if (!begun) speakSystem(clean, onstart, onend); else if (onend) onend(); });
       return;
     }
@@ -73,6 +73,7 @@
   }
   function cancel() {
     try { speechSynthesis.cancel(); } catch (e) {}
+    try { if (window.PCVoice) window.PCVoice.stop(); } catch (e) {}
     try { if (window.EdgeTTS) window.EdgeTTS.stop(); } catch (e) {}
   }
 

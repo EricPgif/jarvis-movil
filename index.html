@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="manifest" href="manifest.json?v=12" />
+<link rel="manifest" href="manifest.json?v=13" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 <style>
   :root{
@@ -186,6 +186,9 @@
       <input id="cfg-base" type="text" placeholder="https://api.minimax.io/anthropic" />
       <label>Modelo</label>
       <input id="cfg-model" type="text" placeholder="MiniMax-M2" />
+      <label>Voz del PC · URL del Worker (opcional)</label>
+      <input id="cfg-tts" type="text" placeholder="https://jarvis-tts.tunombre.workers.dev" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <div class="hint" style="margin-top:2px">Pega aquí la URL del Worker para oír la voz de JARVIS de las pelis (AlvaroNeural). Sin esto, voz del sistema.</div>
 
       <div class="toggle-row">
         <div class="tx">Sonidos de interfaz 🔊<div class="hint" style="margin-top:2px">Ticks al colocarse las apps y al tocar</div></div>
@@ -227,19 +230,20 @@
     </div>
   </div>
 
-  <script src="sfx.js?v=12"></script>
-  <script src="sphere.js?v=12"></script>
-  <script src="api.js?v=12"></script>
-  <script src="edgetts.js?v=12"></script>
-  <script src="voice.js?v=12"></script>
-  <script src="deeplinks.js?v=12"></script>
-  <script src="weather.js?v=12"></script>
-  <script src="router.js?v=12"></script>
-  <script src="super.js?v=12"></script>
-  <script src="intro.js?v=12"></script>
-  <script src="clap.js?v=12"></script>
-  <script src="standby.js?v=12"></script>
-  <script src="extras.js?v=12"></script>
-  <script src="movil.js?v=12"></script>
+  <script src="sfx.js?v=13"></script>
+  <script src="sphere.js?v=13"></script>
+  <script src="api.js?v=13"></script>
+  <script src="edgetts.js?v=13"></script>
+  <script src="pcvoice.js?v=13"></script>
+  <script src="voice.js?v=13"></script>
+  <script src="deeplinks.js?v=13"></script>
+  <script src="weather.js?v=13"></script>
+  <script src="router.js?v=13"></script>
+  <script src="super.js?v=13"></script>
+  <script src="intro.js?v=13"></script>
+  <script src="clap.js?v=13"></script>
+  <script src="standby.js?v=13"></script>
+  <script src="extras.js?v=13"></script>
+  <script src="movil.js?v=13"></script>
 </body>
 </html>

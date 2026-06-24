@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "2.2";
-  var WHATS_NEW = "Sin letras chinas, la voz ya no lee símbolos, Modo Super (chat escribe + esfera grande + botones bien) y versión visible en la intro.";
+  var APP_VERSION = "2.3";
+  var WHATS_NEW = "Voz de JARVIS de las pelis (AlvaroNeural) vía Worker. Pega la URL del Worker en Ajustes → Voz del PC.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -138,6 +138,7 @@
     $("cfg-key").value = CFG.key;
     $("cfg-base").value = CFG.base;
     $("cfg-model").value = CFG.model;
+    $("cfg-tts").value = localStorage.getItem("mm_tts_worker") || "";
     if (window.Extras) window.Extras.init();   // Comandos / Mis Apps / Diagnóstico
     if (window.sfx) $("cfg-sfx").classList.toggle("on", window.sfx.enabled);
     var vl = $("ver-label"); if (vl) vl.textContent = "JARVIS móvil · v" + APP_VERSION;
@@ -148,6 +149,7 @@
     localStorage.setItem("mm_key", $("cfg-key").value.trim());
     localStorage.setItem("mm_base", ($("cfg-base").value.trim() || "https://api.minimax.io/anthropic"));
     localStorage.setItem("mm_model", ($("cfg-model").value.trim() || "MiniMax-M2"));
+    localStorage.setItem("mm_tts_worker", ($("cfg-tts").value.trim().replace(/\/+$/, "")));
     closeSettings();
     if (CFG.key) addMsg("Configuración guardada, señor. ¿En qué puedo ayudarle?", "jv");
   }
