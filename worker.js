@@ -3,12 +3,19 @@
    Genera la voz de Microsoft Edge TTS DESDE EL SERVIDOR (el navegador no puede,
    Microsoft bloquea ese canal). El móvil llama:  GET /tts?text=Hola&voice=es-ES-AlvaroNeural
    y recibe un MP3. Gratis en Cloudflare Workers. Despliegue: ver README.md.
+
+   Alineado con la implementación verificada en Cloudflare (DIYgod/cloudflare-edge-tts)
+   y con el código actual de edge-tts (rany2, Chromium 143). El 403 anterior era por:
+   versión Sec-MS-GEC vieja, falta de ConnectionId y de cabeceras del handshake.
    ───────────────────────────────────────────────────────────────────────── */
 
 const TRUSTED_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 // Cloudflare Workers exige http(s):// en fetch para el upgrade a WebSocket (no acepta wss://).
 const WSS = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1";
-const GEC_VERSION = "1-130.0.2849.68";
+const CHROMIUM_FULL_VERSION = "143.0.3650.75";
+const GEC_VERSION = "1-" + CHROMIUM_FULL_VERSION;
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0";
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
@@ -45,32 +52,52 @@ async function sha256Hex(str) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0").toUpperCase()).join("");
 }
-// Token Sec-MS-GEC: ticks (100ns desde 1601, redondeado a 5 min) + token de confianza
-async function secMsGec() {
-  let ticks = Math.floor((Date.now() / 1000 + 11644473600) / 300) * 300; // segundos redondeados a 5 min
+// Token Sec-MS-GEC: ticks (100ns desde 1601, redondeado a 5 min) + token de confianza.
+// skewMs = corrección de reloj (ms) si el servidor reportó otra hora (anti-403 por desfase).
+async function secMsGec(skewMs) {
+  let ticks = Math.floor(((Date.now() + (skewMs || 0)) / 1000 + 11644473600) / 300) * 300; // seg redondeados a 5 min
   ticks = ticks * 10000000; // a 100-ns
   return sha256Hex(ticks + TRUSTED_TOKEN);
 }
 function xmlEscape(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&apos;").replace(/"/g, "&quot;");
 }
-function connectId() {
-  return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) =>
-    (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)
-  ).replace(/-/g, "");
+function randHex(bytes) {
+  const a = crypto.getRandomValues(new Uint8Array(bytes));
+  return [...a].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function connectId() { return randHex(16); }            // 32 hex (ConnectionId)
+function muid() { return randHex(16).toUpperCase(); }    // 32 hex MAYÚS (cookie muid)
+
+// Abre el WebSocket de síntesis con las cabeceras exactas que exige Microsoft.
+async function openWS(skewMs) {
+  const gec = await secMsGec(skewMs);
+  const wssUrl = `${WSS}?TrustedClientToken=${TRUSTED_TOKEN}&Sec-MS-GEC=${gec}&Sec-MS-GEC-Version=${GEC_VERSION}&ConnectionId=${connectId()}`;
+  return fetch(wssUrl, {
+    headers: {
+      "Upgrade": "websocket",
+      "Sec-WebSocket-Version": "13",
+      "User-Agent": UA,
+      "Origin": "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold",
+      "Accept-Encoding": "gzip, deflate, br, zstd",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Pragma": "no-cache",
+      "Cache-Control": "no-cache",
+      "Cookie": "muid=" + muid() + ";",
+    },
+  });
 }
 
 async function synth(text, voice, rate, pitch) {
-  const gec = await secMsGec();
-  const wssUrl = `${WSS}?TrustedClientToken=${TRUSTED_TOKEN}&Sec-MS-GEC=${gec}&Sec-MS-GEC-Version=${GEC_VERSION}`;
-  const resp = await fetch(wssUrl, { headers: {
-    Upgrade: "websocket",
-    // Microsoft rechaza el handshake si no llegan estas cabeceras (son las que envía edge-tts).
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
-    "Origin": "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold",
-    "Pragma": "no-cache",
-    "Cache-Control": "no-cache",
-  }});
+  // Intento 1.
+  let resp = await openWS(0);
+  // Si Microsoft devuelve 403, suele ser desfase de reloj: nos alineamos a su cabecera Date y reintentamos UNA vez.
+  if (!resp.webSocket && resp.status === 403) {
+    const dateHdr = resp.headers.get("Date");
+    let skewMs = 0;
+    if (dateHdr) { const t = Date.parse(dateHdr); if (!isNaN(t)) skewMs = t - Date.now(); }
+    resp = await openWS(skewMs);
+  }
   const ws = resp.webSocket;
   if (!ws) throw new Error("sin WebSocket (status " + resp.status + ")");
   ws.accept();
@@ -87,7 +114,6 @@ async function synth(text, voice, rate, pitch) {
         if (d.includes("Path:turn.end")) {
           done = true; clearTimeout(timer); try { ws.close(); } catch (e) {}
           if (!chunks.length) return reject(new Error("sin audio"));
-          // concatenar
           let total = 0; chunks.forEach((c) => (total += c.length));
           const out = new Uint8Array(total); let off = 0;
           chunks.forEach((c) => { out.set(c, off); off += c.length; });
