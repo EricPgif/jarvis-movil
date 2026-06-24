@@ -113,8 +113,13 @@
   function needsWeb(t) {
     // Normaliza (sin acentos) → el \b de regex es ASCII y "pasó"/"falleció" rompían el match.
     t = " " + (t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") + " ";
-    return /\b(noticias?|hoy|ayer|reciente|recientemente|ultim[oa]s?|ultima hora|en directo|ahora mismo|este ano|2024|2025|2026|falleci|ha muerto|murio|que le paso|que paso|que ha pasado con|resultado|marcador|precio|cotiza|estreno|cuando sale|ultima version)\b/.test(t)
-        || /\b(busca|buscame|googlea|en internet|en la web)\b/.test(t);
+    return /\b(noticias?|hoy|ayer|manana|reciente|recientemente|ultim[oa]s?|ultima hora|en directo|en vivo|ahora mismo|este ano|2024|2025|2026|falleci|ha muerto|murio|que le paso|que paso|que ha pasado|resultados?|marcador|partidos?|mundial|liga|champions|clasico|gol(es)?|gano|ganador|juega|jugo|clima|tiempo|temperatura|llover|lluvia|grados|pronostico|precio|cuanto cuesta|cotiza|bolsa|estreno|cartelera|cuando sale|cuando es|cuando empieza|horario|ultima version|version nueva|nuevo modelo)\b/.test(t)
+        || /\b(busca|buscame|googlea|en internet|en la web|que se sabe de|informacion (de|sobre|actual))\b/.test(t);
+  }
+  // ¿La respuesta es un "no puedo / no tengo acceso"? → buscaremos y reintentaremos.
+  function isRefusal(t) {
+    t = (t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    return /(no tengo acceso|no puedo acceder|no dispongo de|en tiempo real|fecha limite|fecha de corte|no tengo (informacion|datos|acceso|forma de|manera de|la capacidad)|no puedo (buscar|navegar|consultar|acceder)|no estoy conectad|no tengo conexion|mi conocimiento (llega|tiene)|no tengo acceso a internet)/.test(t);
   }
   function doSearch(q, onStatus) {
     if (onStatus) { try { onStatus("Buscando en la web: " + q.slice(0, 60)); } catch (e) {} }
@@ -207,62 +212,64 @@
     H().push({ role: "user", content: userText });
     saveHist();
     var messages = H().slice();   // copia de trabajo (crece con bloques de herramienta)
+    var didSearch = false;
+    function injectSearch(info) {
+      var i = messages.length - 1;
+      if (info && messages[i] && messages[i].role === "user" && typeof messages[i].content === "string") {
+        messages[i] = { role: "user", content: messages[i].content +
+          "\n\n[Resultados de búsqueda web de AHORA para responderme; úsalos y cita la fuente brevemente, NO digas que no tienes internet]:\n" + info };
+        didSearch = true;
+      }
+    }
+    // Una "ronda" del agente. Devuelve el TEXTO final (sin guardarlo en el historial todavía).
     function loop(depth) {
       return callMiniMax(messages).then(function (data) {
         var blocks = data.content || [];
         var toolUses = blocks.filter(function (b) { return b && b.type === "tool_use"; });
         if (toolUses.length && depth < 3) {
+          didSearch = true;
           messages.push({ role: "assistant", content: blocks });
           return Promise.all(toolUses.map(function (tu) {
             return execTool(tu, onStatus).then(function (res) {
               return { type: "tool_result", tool_use_id: tu.id, content: String(res).slice(0, 4000) };
             });
-          })).then(function (results) {
-            messages.push({ role: "user", content: results });
-            return loop(depth + 1);
-          });
+          })).then(function (results) { messages.push({ role: "user", content: results }); return loop(depth + 1); });
         }
-        // MiniMax-M2 a veces pide la búsqueda como TEXTO (<minimax:tool_call><invoke name="web_search">
-        // <parameter name="query">…) en vez del formato formal. Lo detectamos y buscamos igualmente.
+        // MiniMax-M2 a veces pide la búsqueda como TEXTO en vez del formato formal. La ejecutamos igual.
         var rawText = blocks.filter(function (b) { return b && b.type === "text"; }).map(function (b) { return b.text || ""; }).join(" ");
         var ts = rawText.match(/web_search[\s\S]*?name\s*=\s*["']?query["']?\s*>\s*([^<]+?)\s*<\/parameter>/i);
         if (ts && depth < 3) {
-          var q = ts[1].trim();
-          if (onStatus) { try { onStatus("Buscando en la web: " + q); } catch (e) {} }
-          return fetch(workerBase() + "/search?q=" + encodeURIComponent(q))
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
-              var rs = (d && d.results) || [];
-              var info = rs.length ? rs.slice(0, 5).map(function (x, i) { return (i + 1) + ". " + x.title + " — " + (x.snippet || "") + " (" + x.url + ")"; }).join("\n") : "Sin resultados.";
-              messages.push({ role: "assistant", content: "(buscando en la web: " + q + ")" });
-              messages.push({ role: "user", content: "Resultados de la búsqueda web para \"" + q + "\":\n" + info + "\n\nResponde ahora a mi pregunta usando esto, en español de España, sin mostrar este bloque ni enlaces largos." });
-              return loop(depth + 1);
-            })
-            .catch(function () {
-              var t = cleanText(blocks) || "No pude buscar ahora mismo, señor.";
-              H().push({ role: "assistant", content: t }); saveHist(); return t;
-            });
+          var q = ts[1].trim(); didSearch = true;
+          return doSearch(q, onStatus).then(function (info) {
+            messages.push({ role: "assistant", content: "(buscando en la web: " + q + ")" });
+            messages.push({ role: "user", content: "Resultados de la búsqueda web para \"" + q + "\":\n" + (info || "Sin resultados.") + "\n\nResponde ahora con esto, en español de España, sin mostrar este bloque ni enlaces largos." });
+            return loop(depth + 1);
+          });
         }
-        var txt = cleanText(blocks);
-        if (!txt) txt = "A su servicio, señor.";   // si solo había markup, no dejes el globo vacío
-        H().push({ role: "assistant", content: txt });
-        saveHist();   // recordar la conversación (memoria)
-        return txt;
+        return cleanText(blocks) || "A su servicio, señor.";
       });
     }
-    // Si la pregunta es de info reciente, BUSCAMOS antes y le damos los resultados a MiniMax
-    // pegados a la propia pregunta (garantiza la búsqueda aunque el modelo no use la herramienta).
-    var pre = needsWeb(userText) ? doSearch(userText, onStatus) : Promise.resolve("");
-    return pre.then(function (info) {
-      if (info) {
-        var i = messages.length - 1;
-        if (messages[i] && messages[i].role === "user" && typeof messages[i].content === "string") {
-          messages[i] = { role: "user", content: messages[i].content +
-            "\n\n[Resultados de búsqueda web de AHORA para responderme; úsalos y cita la fuente brevemente, no digas que no tienes internet]:\n" + info };
+    // 1) Pre-búsqueda si la pregunta es claramente de info reciente.
+    var pre = needsWeb(userText) ? doSearch(userText, onStatus).then(injectSearch) : Promise.resolve();
+    return pre.then(function () { return loop(0); })
+      .then(function (txt) {
+        // 2) Red de seguridad: si NO buscó y la respuesta es un "no puedo / no tengo acceso" → busca y reintenta.
+        if (!didSearch && isRefusal(txt)) {
+          return doSearch(userText, onStatus).then(function (info) {
+            if (!info) return txt;
+            didSearch = true;
+            messages.push({ role: "assistant", content: txt });
+            messages.push({ role: "user", content: "Eso SÍ lo puedes saber con esto (búsqueda web de ahora). Responde mi pregunta usando estos datos y cita la fuente; NO digas que no tienes acceso:\n" + info });
+            return loop(0);
+          });
         }
-      }
-      return loop(0);
-    });
+        return txt;
+      })
+      .then(function (finalTxt) {
+        H().push({ role: "assistant", content: finalTxt });
+        saveHist();
+        return finalTxt;
+      });
   }
 
   // Añade al historial un intercambio resuelto LOCALMENTE (deep links, Modo Super…), para que

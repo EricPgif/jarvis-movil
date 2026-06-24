@@ -24,6 +24,8 @@
     pinterest:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#E60023"/><path fill="#fff" d="M12.4 6.4c-3 0-4.7 1.9-4.7 4 0 .98.52 2.2 1.36 2.59.18.08.27.05.31-.14.03-.13.18-.74.25-1.03.02-.09.01-.17-.06-.26-.36-.43-.64-1.22-.64-1.96 0-1.9 1.43-3.74 3.87-3.74 2.11 0 3.58 1.44 3.58 3.5 0 2.32-1.17 3.93-2.7 3.93-.84 0-1.47-.7-1.27-1.55.24-1.02.71-2.12.71-2.86 0-.66-.35-1.21-1.08-1.21-.86 0-1.55.89-1.55 2.08 0 .76.26 1.27.26 1.27l-1.03 4.36c-.3 1.3-.04 2.88-.02 3.04.01.09.13.12.18.05.08-.1 1.07-1.33 1.41-2.55.1-.35.55-2.16.55-2.16.27.52 1.07.98 1.92.98 2.53 0 4.25-2.31 4.25-5.4 0-2.34-1.98-4.52-4.99-4.52z"/></svg>',
     alexa:    '<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#0b1d2a"/><circle cx="12" cy="12" r="7.6" fill="none" stroke="#00CAFF" stroke-width="1.7"/><path d="M12 4.4a7.6 7.6 0 0 1 6 12.2" fill="none" stroke="#1ce5ff" stroke-width="1.7" stroke-linecap="round"/></svg>',
     chrome:   '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#fff"/><path fill="#EA3939" d="M12 3a9 9 0 0 1 7.8 4.5H12a4.5 4.5 0 0 0-3.9 2.25L4.6 5.65A9 9 0 0 1 12 3z"/><path fill="#3ECF4C" d="M4.6 5.65 8.1 9.75A4.5 4.5 0 0 0 9.9 15.6L6.3 21A9 9 0 0 1 4.6 5.65z"/><path fill="#FFCD41" d="M19.8 7.5A9 9 0 0 1 12 21l3.9-6.75A4.5 4.5 0 0 0 15.6 8.7z"/><circle cx="12" cy="12" r="3.4" fill="#fff"/><circle cx="12" cy="12" r="2.7" fill="#4a90e2"/></svg>',
+    steam:    '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1387b8"/><circle cx="14.8" cy="9.4" r="2.5" fill="none" stroke="#fff" stroke-width="1.3"/><circle cx="8.6" cy="14.6" r="1.9" fill="#fff"/><path d="M5.2 14.2l3.4 1.4M14.8 9.4l-6 4.9" stroke="#fff" stroke-width="1.1"/></svg>',
+    mifitness:'<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#fff"/><circle cx="12" cy="12" r="6" fill="none" stroke="#FF6900" stroke-width="2.5"/></svg>',
   };
   // Alias de nombres equivalentes.
   I.twitter = I.x; I.equis = I.x;
@@ -47,8 +49,11 @@
       var svg = I[norm(name)];
       if (svg) return svg;
       if (domain) {
+        // Cascada: logo de marca (Clearbit) → favicon de la web (Google, muy fiable) → pastilla con inicial.
+        var fav = "https://www.google.com/s2/favicons?sz=128&domain=" + encodeURIComponent(domain);
         return '<span class="qi-wrap">' + tile(name) +
-          '<img class="lt-img" loading="lazy" src="https://logo.clearbit.com/' + domain + '" alt="" onerror="this.remove()"></span>';
+          '<img class="lt-img" loading="lazy" src="https://logo.clearbit.com/' + domain + '" data-fb="' + fav + '" alt="" ' +
+          "onerror=\"if(this.dataset.fb){this.src=this.dataset.fb;this.dataset.fb='';}else{this.remove();}\"></span>";
       }
       return '<span class="qi-wrap">' + tile(name) + '</span>';
     },

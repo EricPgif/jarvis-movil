@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "3.7";
-  var WHATS_NEW = "MODO SUPER nuevo: solo voz — toca la esfera (o di «Jarvis») para hablar. Coloca tus apps alrededor de la esfera arrastrándolas (mantén pulsada y mueve), ＋ para añadir, suelta en «Quitar» para sacarlas. Logos corregidos (ChatGPT, Pinterest, Alexa, Chrome).";
+  var APP_VERSION = "3.8";
+  var WHATS_NEW = "El agente busca mejor (clima, partidos…) y si dice «no tengo acceso» busca y reintenta. Modo Super: apps en azul HUD dando vueltas, arrastre arreglado, «Limpiar todo» para empezar de cero. Logos: Steam, Mi Fitness y casi todos salen de verdad.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──

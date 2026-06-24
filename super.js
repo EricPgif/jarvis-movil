@@ -7,27 +7,30 @@
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 
-  // Apps FIJAS del Super (las mismas del dock). open() = cómo abrir cada una.
+  // Apps por defecto del Super (las mismas del dock). Descriptores: app=clave deeplink / cam=cámara.
   var DEFAULTS = [
-    { name: "Spotify",  open: function () { return window.Links.openApp("spotify"); } },
-    { name: "YouTube",  open: function () { return window.Links.openApp("youtube"); } },
-    { name: "WhatsApp", open: function () { return window.Links.openApp("whatsapp"); } },
-    { name: "Telegram", open: function () { return window.Links.openApp("telegram"); } },
-    { name: "Chrome",   open: function () { return window.Links.openApp("chrome"); } },
-    { name: "Gmail",    open: function () { return window.Links.openApp("gmail"); } },
-    { name: "Agenda",   domain: "", open: function () { return window.Links.openApp("calendario"); } },
-    { name: "Cámara",   domain: "", open: function () { var c = $("cam"); if (c) c.click(); return null; } },
+    { name: "Spotify", app: "spotify" }, { name: "YouTube", app: "youtube" },
+    { name: "WhatsApp", app: "whatsapp" }, { name: "Telegram", app: "telegram" },
+    { name: "Chrome", app: "chrome" }, { name: "Gmail", app: "gmail" },
+    { name: "Agenda", app: "calendario" }, { name: "Cámara", cam: true },
   ];
   function myApps() { return (window.Extras && window.Extras.getApps) ? window.Extras.getApps() : []; }
-  function placedApps() {
-    var list = DEFAULTS.slice();
+  // Conjunto colocado del Super (propio: se siembra de defaults+my_apps, luego se gestiona aquí).
+  function getSet() {
+    var raw; try { raw = JSON.parse(localStorage.getItem("super_set") || "null"); } catch (e) {}
+    if (Array.isArray(raw)) return raw;
+    var s = DEFAULTS.map(function (d) { return { name: d.name, app: d.app, cam: d.cam, domain: d.domain || "" }; });
     myApps().forEach(function (a) {
-      if (!list.some(function (x) { return x.name.toLowerCase() === a.name.toLowerCase(); })) {
-        list.push({ name: a.name, custom: true, url: a.url, web: a.web, domain: a.domain,
-          open: function () { return window.Links.open(a.url || a.web, a.web || (/^https?:/.test(a.url) ? a.url : null)); } });
-      }
+      if (!s.some(function (x) { return x.name.toLowerCase() === a.name.toLowerCase(); }))
+        s.push({ name: a.name, url: a.url, web: a.web, domain: a.domain || "" });
     });
-    return list;
+    setSet(s); return s;
+  }
+  function setSet(s) { try { localStorage.setItem("super_set", JSON.stringify(s)); } catch (e) {} }
+  function openDesc(d) {
+    if (d.cam) { var c = $("cam"); if (c) c.click(); return null; }
+    if (d.app) return window.Links.openApp(d.app);
+    return window.Links.open(d.url || d.web, d.web || (/^https?:/.test(d.url) ? d.url : null));
   }
   function iconFor(a) { return window.AppIcons ? window.AppIcons.html(a.name, a.domain) : esc(a.name.charAt(0)); }
   function getPos() { try { return JSON.parse(localStorage.getItem("super_pos") || "{}") || {}; } catch (e) { return {}; } }
@@ -76,6 +79,15 @@
   .sup-app.drag .si{transform:scale(1.2);border-color:var(--cyan);box-shadow:0 0 26px var(--cyan-glow);}
   .sup-app:active .si{transform:scale(.9);}
   .sup-app .sl{font-size:10px;color:var(--text-dim);letter-spacing:.3px;max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* Logos en AZUL HUD (mismo color que JARVIS) dentro del Super */
+  .sup-app .si svg,.sup-app .si img{filter:brightness(0) saturate(100%) invert(70%) sepia(60%) saturate(3200%) hue-rotate(155deg) brightness(104%) contrast(101%);}
+  .sup-app .si .lt{background:rgba(0,212,255,.16)!important;color:var(--cyan)!important;}
+  /* Las apps DAN VUELTAS (orbitan) lentamente; el icono se mantiene derecho. Se pausa al arrastrar. */
+  #sup-ring{animation:supOrbitAll 95s linear infinite;}
+  @keyframes supOrbitAll{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  .sup-app .si,.sup-app .sl{animation:supUpright 95s linear infinite;}
+  @keyframes supUpright{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
+  #view-super.sdrag #sup-ring,#view-super.sdrag .sup-app .si,#view-super.sdrag .sup-app .sl{animation-play-state:paused;}
   @keyframes supSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   #super-log{position:absolute;left:10px;right:10px;bottom:calc(96px + env(safe-area-inset-bottom));max-height:12vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;z-index:5;pointer-events:none;-webkit-mask-image:linear-gradient(transparent,#000 38%);mask-image:linear-gradient(transparent,#000 38%);}
   #super-log .msg{pointer-events:auto;max-width:86%;padding:8px 12px;border-radius:13px;font-size:14px;line-height:1.4;white-space:pre-wrap;word-break:break-word;}
@@ -137,9 +149,10 @@
 
     // Drawer de apps (al final del body)
     var d = document.createElement("div"); d.id = "sup-apps";
-    d.innerHTML = '<div class="sheet2"><h3>Tus apps</h3><p>Toca para colocarla alrededor de JARVIS. Mantén pulsada una app para moverla; suéltala en «Quitar» para sacarla.</p><div class="sup-pick" id="sup-pick"></div><button class="closex" id="sup-apps-x">Cerrar</button></div>';
+    d.innerHTML = '<div class="sheet2"><h3>Tus apps</h3><p>Toca una para colocarla alrededor de JARVIS. Mantén pulsada una app de la esfera para moverla; suéltala en «Quitar» para sacarla.</p><div class="sup-pick" id="sup-pick"></div><button class="closex" id="sup-clear" style="border-color:var(--red);color:var(--red);background:transparent;margin-bottom:8px">🗑 Limpiar todo (empezar de cero)</button><button class="closex" id="sup-apps-x">Cerrar</button></div>';
     document.body.appendChild(d);
     $("sup-apps-x").addEventListener("click", function () { d.classList.remove("show"); });
+    $("sup-clear").addEventListener("click", function () { if (confirm("¿Quitar TODAS las apps de la esfera, señor? Podrás añadir las que quieras.")) clearAllApps(); });
     d.addEventListener("click", function (e) { if (e.target === d) d.classList.remove("show"); });
   }
 
@@ -160,7 +173,7 @@
   function renderTiles() {
     var ring = $("sup-ring"); if (!ring) return;
     ring.innerHTML = "";
-    var apps = placedApps(), pos = getPos(), n = apps.length;
+    var apps = getSet(), pos = getPos(), n = apps.length;
     apps.forEach(function (a, i) {
       var ang = (a.name in pos) ? pos[a.name] : Math.round((i / Math.max(n, 1)) * 360 - 90);
       var b = document.createElement("button");
@@ -171,9 +184,8 @@
     });
   }
   function removeApp(a) {
-    if (!a.custom) { if (window.APP) APP.addMsg("«" + a.name + "» es fija, señor; no se puede quitar.", "sys"); return; }
-    var apps = myApps().filter(function (x) { return x.name.toLowerCase() !== a.name.toLowerCase(); });
-    if (window.Extras) { window.Extras.setApps(apps); window.Extras.refresh(); }
+    var s = getSet().filter(function (x) { return x.name.toLowerCase() !== a.name.toLowerCase(); });
+    setSet(s);
     var p = getPos(); delete p[a.name]; setPos(p);
     renderTiles();
   }
@@ -182,67 +194,82 @@
     if (on === undefined) { var r = t.getBoundingClientRect(); return x >= r.left - 30 && x <= r.right + 30 && y >= r.top - 30 && y <= r.bottom + 30; }
     t.classList.toggle("show", on);
   }
+  function ringRot() {   // rotación actual del anillo (para que el ángulo del dedo sea correcto)
+    var ring = $("sup-ring"); if (!ring) return 0;
+    var m = getComputedStyle(ring).transform;
+    var v = m && m.match(/matrix\(([^)]+)\)/);
+    if (!v) return 0;
+    var p = v[1].split(",").map(parseFloat);
+    return Math.atan2(p[1], p[0]) * 180 / Math.PI;
+  }
   function attachDrag(el, app) {
-    var hold = null, dragging = false, moved = false, cx = 0, cy = 0, sx = 0, sy = 0;
+    var hold = null, dragging = false, moved = false, cx = 0, cy = 0, sx = 0, sy = 0, rot0 = 0;
     el.addEventListener("pointerdown", function (ev) {
       moved = false; dragging = false; sx = ev.clientX; sy = ev.clientY;
       var r = $("sup-ring").getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2;
+      try { el.setPointerCapture(ev.pointerId); } catch (e) {}   // capturar el dedo YA (clave para que arrastre)
       hold = setTimeout(function () {
         dragging = true; el.classList.add("drag");
+        $("view-super").classList.add("sdrag");                  // pausa la rotación mientras arrastras
+        rot0 = ringRot();
         try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
         trashHot(0, 0, true);
-        try { el.setPointerCapture(ev.pointerId); } catch (e) {}
-      }, 320);
+      }, 300);
     });
     el.addEventListener("pointermove", function (ev) {
       if (!dragging) {
-        if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 10) { moved = true; if (hold) { clearTimeout(hold); hold = null; } }
+        if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 12) { moved = true; if (hold) { clearTimeout(hold); hold = null; } }
         return;
       }
-      var a = Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI;
+      var a = Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI - rot0;   // ángulo en el marco del anillo
       el.style.setProperty("--ang", a + "deg");
       var t = $("sup-trash"); if (t) t.classList.toggle("hot", trashHot(ev.clientX, ev.clientY));
     });
     function end(ev) {
       if (hold) { clearTimeout(hold); hold = null; }
+      try { el.releasePointerCapture(ev.pointerId); } catch (e) {}
       if (dragging) {
-        dragging = false; el.classList.remove("drag"); trashHot(0, 0, false);
+        dragging = false; el.classList.remove("drag"); $("view-super").classList.remove("sdrag"); trashHot(0, 0, false);
         if (trashHot(ev.clientX, ev.clientY)) { removeApp(app); return; }
         var ang = parseFloat(el.style.getPropertyValue("--ang")) || 0;
         var p = getPos(); p[app.name] = Math.round(ang); setPos(p);
       } else if (!moved) {
-        var say = app.open && app.open();
+        var say = openDesc(app);
         if (say && window.APP) APP.addMsg(say, "jv");
       }
     }
     el.addEventListener("pointerup", end);
-    el.addEventListener("pointercancel", function () { if (hold) { clearTimeout(hold); hold = null; } if (dragging) { dragging = false; el.classList.remove("drag"); trashHot(0, 0, false); } });
+    el.addEventListener("pointercancel", function () { if (hold) { clearTimeout(hold); hold = null; } if (dragging) { dragging = false; el.classList.remove("drag"); $("view-super").classList.remove("sdrag"); trashHot(0, 0, false); } });
   }
 
   // ── Drawer: añadir apps ──
+  function allCatalog() {
+    var out = DEFAULTS.map(function (d) { return { name: d.name, app: d.app, cam: d.cam, domain: d.domain || "" }; });
+    var cat = (window.Extras && window.Extras.catalog) ? window.Extras.catalog : [];
+    cat.forEach(function (c) {
+      if (!out.some(function (x) { return x.name.toLowerCase() === c.name.toLowerCase(); }))
+        out.push({ name: c.name, url: c.url, web: c.web, domain: c.domain || "" });
+    });
+    return out;
+  }
   function openApps() {
     var pick = $("sup-pick"); if (!pick) return;
-    var placed = {}; placedApps().forEach(function (a) { placed[a.name.toLowerCase()] = 1; });
-    var cat = (window.Extras && window.Extras.catalog) ? window.Extras.catalog : [];
-    var avail = cat.filter(function (c) { return !placed[c.name.toLowerCase()]; });
+    var placed = {}; getSet().forEach(function (a) { placed[a.name.toLowerCase()] = 1; });
+    var avail = allCatalog().filter(function (c) { return !placed[c.name.toLowerCase()]; });
     pick.innerHTML = avail.map(function (c) {
       return '<button data-app="' + esc(c.name) + '"><span class="pi">' + (window.AppIcons ? window.AppIcons.html(c.name, c.domain) : "▣") + '</span>' + esc(c.name) + '</button>';
-    }).join("") || '<p style="grid-column:1/-1">Ya las tienes todas colocadas, señor.</p>';
+    }).join("") || '<p style="grid-column:1/-1">Ya están todas colocadas, señor.</p>';
     Array.prototype.forEach.call(pick.querySelectorAll("button"), function (b) {
       b.addEventListener("click", function () {
-        var c = (window.Extras.catalog || []).filter(function (x) { return x.name === b.dataset.app; })[0];
+        var c = avail.filter(function (x) { return x.name === b.dataset.app; })[0];
         if (!c) return;
-        var apps = myApps();
-        if (!apps.some(function (a) { return a.name.toLowerCase() === c.name.toLowerCase(); })) {
-          apps.push({ name: c.name, url: c.url, web: c.web, domain: c.domain || "" });
-          if (window.Extras) { window.Extras.setApps(apps); window.Extras.refresh(); }
-        }
-        renderTiles();
-        $("sup-apps").classList.remove("show");
+        var s = getSet(); s.push(c); setSet(s);
+        renderTiles(); openApps();   // refresca para poder añadir varias seguidas
       });
     });
     $("sup-apps").classList.add("show");
   }
+  function clearAllApps() { setSet([]); setPos({}); renderTiles(); openApps(); }
 
   function tick() {
     var n = new Date(), p = function (x) { return String(x).padStart(2, "0"); };
