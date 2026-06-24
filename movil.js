@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "4.0";
-  var WHATS_NEW = "Logos de verdad dibujados a mano (Fotos, Traductor, Play Store, Drive, Gemini, Wallet, Discord, Epic, Facebook…). Gmail abre la APP (no el navegador). Y en el Modo Super los logos van a TODO COLOR (se acabó el pegote azul).";
+  var APP_VERSION = "4.1";
+  var WHATS_NEW = "Modo Super: ¡las apps GIRAN alrededor de la esfera Y se pueden tocar y arrastrar a la vez! Ya no hay «campo invisible»: arrastras hasta la papelera sin límite. Tope de 15 apps. Y el icono nuevo de Gmail.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──

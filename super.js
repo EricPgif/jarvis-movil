@@ -71,8 +71,8 @@
     border:0;background:transparent;padding:0;-webkit-appearance:none;appearance:none;touch-action:none;z-index:4;
     --x:0px;--y:0px;
     transform:translate(calc(-50% + var(--x)), calc(-50% + var(--y)));
-    transition:transform .15s cubic-bezier(.2,.7,.2,1);}
-  .sup-app.drag{transition:none;z-index:9;}
+    will-change:transform;}
+  .sup-app.drag{z-index:9;}
   .sup-app .si{width:46px;height:46px;border-radius:14px;border:1px solid var(--border-hi);background:rgba(10,23,38,.85);color:var(--cyan);display:flex;align-items:center;justify-content:center;box-shadow:0 0 14px rgba(0,212,255,.16);transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;overflow:hidden;}
   .sup-app .si svg,.sup-app .si .qi-wrap{width:30px;height:30px;}
   .sup-app .si .lt{font-size:15px;border-radius:8px;}
@@ -162,27 +162,42 @@
     else { if (s) s.textContent = "EN LÍNEA"; if (window.Sphere && Sphere.state && Sphere.state.mode === "listening") Sphere.setMode("idle"); }
   }
 
-  // ── Apps alrededor de la esfera + arrastrar ──
-  // Posición por defecto (repartidas en 2 anillos para que NO se solapen con muchas apps).
-  function defaultXY(i) {
-    var R = Math.min(Math.min(window.innerWidth, window.innerHeight) * 0.37, 180);
-    var ring = i < 8 ? 0 : 1, idx = ring === 0 ? i : i - 8;
-    var r = ring === 0 ? R : R * 0.58;
-    var a = (idx / 8) * Math.PI * 2 - Math.PI / 2;
-    return { x: Math.round(Math.cos(a) * r), y: Math.round(Math.sin(a) * r) };
-  }
+  // ── Apps que ORBITAN alrededor de la esfera (girando) + clicables + arrastrables ──
+  var MAX_APPS = 15;
+  var ORBIT = { tiles: [], rot: 0, raf: 0, paused: false };
+  function orbitR() { return Math.min(Math.min(window.innerWidth, window.innerHeight) * 0.37, 178); }
   function renderTiles() {
     var ring = $("sup-ring"); if (!ring) return;
-    ring.innerHTML = "";
-    var apps = getSet(), pos = getPos();
+    if (ORBIT.raf) { cancelAnimationFrame(ORBIT.raf); ORBIT.raf = 0; }
+    ring.innerHTML = ""; ORBIT.tiles = [];
+    var apps = getSet(), pos = getPos(), n = apps.length;
     apps.forEach(function (a, i) {
-      var p = (pos[a.name] && typeof pos[a.name] === "object") ? pos[a.name] : defaultXY(i);
       var b = document.createElement("button");
-      b.className = "sup-app"; b.style.setProperty("--x", (p.x || 0) + "px"); b.style.setProperty("--y", (p.y || 0) + "px");
+      b.className = "sup-app";
       b.innerHTML = '<span class="si">' + iconFor(a) + '</span><span class="sl">' + esc(a.name) + '</span>';
-      attachDrag(b, a);
+      // ángulo base guardado (número) o repartido en círculo (auto-organizado)
+      var baseAng = (typeof pos[a.name] === "number") ? pos[a.name] : Math.round((i / Math.max(n, 1)) * 360 - 90);
+      var t = { el: b, app: a, baseAng: baseAng, dragging: false };
+      attachDrag(t);
+      ORBIT.tiles.push(t);
       ring.appendChild(b);
     });
+    startOrbit();
+  }
+  function startOrbit() {
+    if (ORBIT.raf) return;
+    (function frame() {
+      if (!isOpen()) { ORBIT.raf = 0; return; }
+      if (!ORBIT.paused) ORBIT.rot = (ORBIT.rot + 0.05) % 360;   // giro lento (~120 s/vuelta)
+      var R = orbitR();
+      ORBIT.tiles.forEach(function (t) {
+        if (t.dragging) return;
+        var a = (t.baseAng + ORBIT.rot) * Math.PI / 180;
+        t.el.style.setProperty("--x", Math.round(Math.cos(a) * R) + "px");
+        t.el.style.setProperty("--y", Math.round(Math.sin(a) * R) + "px");
+      });
+      ORBIT.raf = requestAnimationFrame(frame);
+    })();
   }
   function removeApp(a) {
     var s = getSet().filter(function (x) { return x.name.toLowerCase() !== a.name.toLowerCase(); });
@@ -195,14 +210,14 @@
     if (on === undefined) { var r = t.getBoundingClientRect(); return x >= r.left - 30 && x <= r.right + 30 && y >= r.top - 30 && y <= r.bottom + 30; }
     t.classList.toggle("show", on);
   }
-  function attachDrag(el, app) {
-    var hold = null, dragging = false, moved = false, cx = 0, cy = 0, sx = 0, sy = 0;
+  function attachDrag(t) {
+    var el = t.el, hold = null, dragging = false, moved = false, cx = 0, cy = 0, sx = 0, sy = 0;
     el.addEventListener("pointerdown", function (ev) {
       moved = false; dragging = false; sx = ev.clientX; sy = ev.clientY;
       var r = $("sup-ring").getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2;
-      try { el.setPointerCapture(ev.pointerId); } catch (e) {}   // capturar el dedo YA (clave para que arrastre de verdad)
+      try { el.setPointerCapture(ev.pointerId); } catch (e) {}   // capturar el dedo YA
       hold = setTimeout(function () {
-        dragging = true; el.classList.add("drag");
+        dragging = true; t.dragging = true; ORBIT.paused = true; el.classList.add("drag");   // pausa la órbita al cogerla
         try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
         trashHot(0, 0, true);
       }, 280);
@@ -212,30 +227,28 @@
         if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 12) { moved = true; if (hold) { clearTimeout(hold); hold = null; } }
         return;
       }
-      // Colocación LIBRE: el icono sigue al dedo (limitado a un radio razonable).
-      var lim = Math.min(window.innerWidth, window.innerHeight) * 0.46;
-      var dx = Math.max(-lim, Math.min(lim, ev.clientX - cx));
-      var dy = Math.max(-lim, Math.min(lim, ev.clientY - cy));
-      el.style.setProperty("--x", Math.round(dx) + "px");
-      el.style.setProperty("--y", Math.round(dy) + "px");
-      var t = $("sup-trash"); if (t) t.classList.toggle("hot", trashHot(ev.clientX, ev.clientY));
+      // Sigue al dedo SIN límite (así llega a la papelera o a cualquier sitio).
+      el.style.setProperty("--x", Math.round(ev.clientX - cx) + "px");
+      el.style.setProperty("--y", Math.round(ev.clientY - cy) + "px");
+      var tt = $("sup-trash"); if (tt) tt.classList.toggle("hot", trashHot(ev.clientX, ev.clientY));
     });
     function end(ev) {
       if (hold) { clearTimeout(hold); hold = null; }
       try { el.releasePointerCapture(ev.pointerId); } catch (e) {}
       if (dragging) {
-        dragging = false; el.classList.remove("drag"); trashHot(0, 0, false);
-        if (trashHot(ev.clientX, ev.clientY)) { removeApp(app); return; }
-        var p = getPos();
-        p[app.name] = { x: parseFloat(el.style.getPropertyValue("--x")) || 0, y: parseFloat(el.style.getPropertyValue("--y")) || 0 };
-        setPos(p);
+        dragging = false; t.dragging = false; ORBIT.paused = false; el.classList.remove("drag"); trashHot(0, 0, false);
+        if (trashHot(ev.clientX, ev.clientY)) { removeApp(t.app); return; }
+        // Vuelve al anillo: ángulo = el del dedo MENOS la rotación actual (sigue orbitando desde ahí).
+        var ang = Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI - ORBIT.rot;
+        t.baseAng = ang;
+        var p = getPos(); p[t.app.name] = Math.round(ang); setPos(p);
       } else if (!moved) {
-        var say = openDesc(app);
+        var say = openDesc(t.app);
         if (say && window.APP) APP.addMsg(say, "jv");
       }
     }
     el.addEventListener("pointerup", end);
-    el.addEventListener("pointercancel", function () { if (hold) { clearTimeout(hold); hold = null; } if (dragging) { dragging = false; el.classList.remove("drag"); trashHot(0, 0, false); } });
+    el.addEventListener("pointercancel", function () { if (hold) { clearTimeout(hold); hold = null; } if (dragging) { dragging = false; t.dragging = false; ORBIT.paused = false; el.classList.remove("drag"); trashHot(0, 0, false); } });
   }
 
   // ── Drawer: añadir apps ──
@@ -259,7 +272,9 @@
       b.addEventListener("click", function () {
         var c = avail.filter(function (x) { return x.name === b.dataset.app; })[0];
         if (!c) return;
-        var s = getSet(); s.push(c); setSet(s);
+        var s = getSet();
+        if (s.length >= MAX_APPS) { alert("Máximo " + MAX_APPS + " apps en la esfera, señor. Quita alguna primero (arrástrala a la papelera)."); return; }
+        s.push(c); setSet(s);
         renderTiles(); openApps();   // refresca para poder añadir varias seguidas
       });
     });
