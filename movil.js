@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "3.3";
-  var WHATS_NEW = "¡Varias conversaciones con nombre, como en Claude! Barra arriba del chat para cambiar, crear (＋) y limpiar (🗑) — ya no hay que entrar en Ajustes. Lo que sé de ti se conserva en todas.";
+  var APP_VERSION = "3.4";
+  var WHATS_NEW = "Empiezas con un solo «Chat principal» (todo tu historial) y creas más con ＋. Correo ahora es Gmail (abre la app). Y las apps que añades salen con su logo (Discord, Netflix, Instagram…).";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──

@@ -30,7 +30,7 @@
     var old = [];
     try { var h = JSON.parse(localStorage.getItem("mm_history") || "[]"); if (h && h.length) old = h; } catch (e) {}
     var id = genId();
-    return { active: id, convos: [{ id: id, name: "Conversación 1", history: old }] };
+    return { active: id, convos: [{ id: id, name: "Chat principal", history: old }] };
   }
   var STORE = loadStore();
   function saveStore() { try { localStorage.setItem("mm_convos", JSON.stringify(STORE)); } catch (e) {} }
@@ -250,7 +250,7 @@
     });
   }
   function newConvo(name) {
-    var c = { id: genId(), name: (name || "").trim() || ("Conversación " + (STORE.convos.length + 1)), history: [] };
+    var c = { id: genId(), name: (name || "").trim() || ("Chat " + (STORE.convos.length + 1)), history: [] };
     STORE.convos.push(c); STORE.active = c.id; saveStore(); return c.id;
   }
   function switchConvo(id) {
@@ -263,7 +263,7 @@
   }
   function deleteConvo(id) {
     STORE.convos = STORE.convos.filter(function (c) { return c.id !== id; });
-    if (!STORE.convos.length) STORE.convos.push({ id: genId(), name: "Conversación 1", history: [] });
+    if (!STORE.convos.length) STORE.convos.push({ id: genId(), name: "Chat principal", history: [] });
     if (!STORE.convos.some(function (c) { return c.id === STORE.active; })) STORE.active = STORE.convos[0].id;
     saveStore();
   }

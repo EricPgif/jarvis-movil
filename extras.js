@@ -51,7 +51,8 @@
     getApps().forEach(function (a, i) {
       var b = document.createElement("button");
       b.className = "qbtn"; b.setAttribute("data-myapp", i);
-      b.innerHTML = '<span class="qi">▣</span><span class="ql">' + esc(a.name.slice(0, 9)) + '</span>';
+      var ic = (window.AppIcons && window.AppIcons.get(a.name)) || "▣";   // logo del catálogo si existe
+      b.innerHTML = '<span class="qi">' + ic + '</span><span class="ql">' + esc(a.name.slice(0, 9)) + '</span>';
       b.addEventListener("click", function () {
         if (window.Links) window.Links.open(a.url, a.web || (/^https?:/.test(a.url) ? a.url : null));
         else window.location.href = a.url;
@@ -96,7 +97,7 @@
     var box = $("app-suggest"); if (!box) return;
     var have = {}; getApps().forEach(function (a) { have[a.name.toLowerCase()] = 1; });
     box.innerHTML = COMMON.filter(function (c) { return c.url && !have[c.name.toLowerCase()]; })
-      .map(function (c) { return '<button class="app-chip" data-app="' + esc(c.name) + '">+ ' + esc(c.name) + '</button>'; }).join("");
+      .map(function (c) { var ic = (window.AppIcons && window.AppIcons.get(c.name)) || ""; return '<button class="app-chip" data-app="' + esc(c.name) + '">' + ic + esc(c.name) + '</button>'; }).join("");
     Array.prototype.forEach.call(box.querySelectorAll(".app-chip"), function (b) {
       b.addEventListener("click", function () {
         var c = COMMON.filter(function (x) { return x.name === b.dataset.app; })[0];
