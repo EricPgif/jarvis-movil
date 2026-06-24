@@ -72,33 +72,45 @@
            " Usa estos datos cuando pregunte por la fecha, la hora o el tiempo (no inventes fechas)." + mem;
   }
 
-  function askMiniMax(userText) {
-    var key = CFG.key;
-    if (!key) return Promise.reject(new Error("sin key"));
-    history.push({ role: "user", content: userText });
-    if (history.length > 30) history = history.slice(-30);
-    var payload = {
-      model: CFG.model, max_tokens: 1536, temperature: 0.55,
-      system: buildSystem(), thinking: { type: "disabled" }, messages: history,
-    };
-    var ctrl, to;
-    try { ctrl = new AbortController(); to = setTimeout(function () { ctrl.abort(); }, 45000); } catch (e) {}
-    return fetch(CFG.base + "/v1/messages", {
-      method: "POST",
-      // SOLO estas dos cabeceras: el CORS de MiniMax bloquea x-api-key y anthropic-version.
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
-      body: JSON.stringify(payload),
-      signal: ctrl && ctrl.signal,
-    }).then(function (r) {
-      if (to) clearTimeout(to);
-      return r.json().then(function (data) {
-        if (!r.ok || data.error) {
-          var msg = (data && data.error && (data.error.message || data.error)) || ("HTTP " + r.status);
-          throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
-        }
-        var txt = "";
-        (data.content || []).forEach(function (bl) { if (bl && bl.type === "text") txt += (bl.text || ""); });
-        txt = txt.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "");
+  // ── Herramientas (la base de los "agentes"). De momento: búsqueda web (la hace el Worker). ──
+  var TOOLS = [{
+    name: "web_search",
+    description: "Busca información ACTUAL en internet: noticias de hoy, datos en tiempo real, precios, " +
+      "resultados, o cualquier cosa reciente/posterior a tu conocimiento o que no sepas con certeza. " +
+      "NO la uses para cosas que ya sabes; solo cuando de verdad haga falta info reciente o verificable.",
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string", description: "La consulta a buscar, concisa." } },
+      required: ["query"],
+    },
+  }];
+  function workerBase() {
+    var w = (localStorage.getItem("mm_tts_worker") || "").trim() || "https://rapid-sky-2af7.ericponceal.workers.dev";
+    return w.replace(/\/+$/, "");
+  }
+  // Ejecuta una herramienta → devuelve texto para el tool_result.
+  function execTool(tu, onStatus) {
+    if (tu.name === "web_search") {
+      var q = (tu.input && tu.input.query) || "";
+      if (onStatus) { try { onStatus("Buscando en la web: " + q); } catch (e) {} }
+      return fetch(workerBase() + "/search?q=" + encodeURIComponent(q))
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var rs = (d && d.results) || [];
+          if (!rs.length) return "No se encontraron resultados para esa búsqueda.";
+          return rs.slice(0, 5).map(function (x, i) {
+            return (i + 1) + ". " + x.title + " — " + (x.snippet || "") + " (" + x.url + ")";
+          }).join("\n");
+        })
+        .catch(function () { return "La búsqueda web no respondió (sin conexión o Worker no disponible)."; });
+    }
+    return Promise.resolve("Herramienta no disponible.");
+  }
+  // Limpia el texto de una respuesta: markup de tool_call (código raro), CJK, espacios; abre app si lo pidió por markup.
+  function cleanText(blocks) {
+    var txt = "";
+    (blocks || []).forEach(function (bl) { if (bl && bl.type === "text") txt += (bl.text || ""); });
+    txt = txt.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "");
         // MiniMax-M2 a veces intenta "tool calls" (aún NO soportados aquí) y los suelta como TEXTO
         // (el "código raro": <minimax:tool_call><invoke ...>). Si pidió abrir una app, la abrimos de
         // verdad; y SIEMPRE limpiamos ese markup para que NO se vea nunca.
@@ -115,17 +127,71 @@
         txt = txt.replace(/<\/?(?:minimax:)?(?:tool_call|invoke|parameter)\b[^>]*>/gi, "");
         // MiniMax a veces cuela caracteres chinos/japoneses/coreanos aunque hable español → fuera.
         txt = txt.replace(/[　-〿぀-ヿ㐀-䶿一-鿿가-힯豈-﫿＀-￯]/g, "");
-        txt = txt.replace(/[ \t]{2,}/g, " ").trim();
-        if (!txt) txt = "A su servicio, señor.";   // si solo había markup, no dejes el globo vacío
-        history.push({ role: "assistant", content: txt });
-        saveHist();   // recordar la conversación (memoria)
-        return txt;
+    txt = txt.replace(/[ \t]{2,}/g, " ").trim();
+    return txt;
+  }
+
+  // Una llamada a MiniMax (con herramientas). Devuelve los datos crudos.
+  function callMiniMax(messages) {
+    var key = CFG.key;
+    var payload = {
+      model: CFG.model, max_tokens: 1536, temperature: 0.55,
+      system: buildSystem(), thinking: { type: "disabled" }, messages: messages, tools: TOOLS,
+    };
+    var ctrl, to;
+    try { ctrl = new AbortController(); to = setTimeout(function () { ctrl.abort(); }, 45000); } catch (e) {}
+    return fetch(CFG.base + "/v1/messages", {
+      method: "POST",
+      // SOLO estas dos cabeceras: el CORS de MiniMax bloquea x-api-key y anthropic-version.
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+      body: JSON.stringify(payload),
+      signal: ctrl && ctrl.signal,
+    }).then(function (r) {
+      if (to) clearTimeout(to);
+      return r.json().then(function (data) {
+        if (!r.ok || data.error) {
+          var msg = (data && data.error && (data.error.message || data.error)) || ("HTTP " + r.status);
+          throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+        }
+        return data;
       });
     }).catch(function (err) {
       if (to) clearTimeout(to);
       if (err && err.name === "AbortError") throw new Error("La respuesta tardó demasiado, señor. Inténtelo de nuevo.");
       throw err;
     });
+  }
+
+  // Pregunta a MiniMax con BUCLE de herramientas (la base del agente). onStatus(texto) para avisos
+  // tipo "Buscando en la web…". Máx 3 rondas de herramienta para no encadenar sin fin.
+  function askMiniMax(userText, onStatus) {
+    if (!CFG.key) return Promise.reject(new Error("sin key"));
+    history.push({ role: "user", content: userText });
+    if (history.length > 30) history = history.slice(-30);
+    var messages = history.slice();   // copia de trabajo (crece con bloques de herramienta)
+    function loop(depth) {
+      return callMiniMax(messages).then(function (data) {
+        var blocks = data.content || [];
+        var toolUses = blocks.filter(function (b) { return b && b.type === "tool_use"; });
+        if (toolUses.length && depth < 3) {
+          messages.push({ role: "assistant", content: blocks });
+          return Promise.all(toolUses.map(function (tu) {
+            return execTool(tu, onStatus).then(function (res) {
+              return { type: "tool_result", tool_use_id: tu.id, content: String(res).slice(0, 4000) };
+            });
+          })).then(function (results) {
+            messages.push({ role: "user", content: results });
+            return loop(depth + 1);
+          });
+        }
+        var txt = cleanText(blocks);
+        if (!txt) txt = "A su servicio, señor.";   // si solo había markup, no dejes el globo vacío
+        history.push({ role: "assistant", content: txt });
+        saveHist();   // recordar la conversación (memoria)
+        return txt;
+      });
+    }
+    return loop(0);
   }
 
   // Añade al historial un intercambio resuelto LOCALMENTE (deep links, Modo Super…), para que

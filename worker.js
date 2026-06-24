@@ -26,8 +26,17 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
+
+    // ── Agente: búsqueda web (la hace el servidor; el navegador no puede por CORS) ──
+    if (url.pathname === "/search") {
+      const q = (url.searchParams.get("q") || "").trim();
+      if (!q) return jsonRes({ results: [] });
+      try { return jsonRes({ results: await webSearch(q) }); }
+      catch (e) { return jsonRes({ results: [], error: String((e && e.message) || e) }); }
+    }
+
     if (url.pathname !== "/tts" && url.pathname !== "/") {
-      return new Response("JARVIS TTS Worker. Usa /tts?text=...", { status: 404, headers: CORS });
+      return new Response("JARVIS Worker. Usa /tts?text=... o /search?q=...", { status: 404, headers: CORS });
     }
     let text = url.searchParams.get("text") || "";
     const voice = url.searchParams.get("voice") || "es-ES-AlvaroNeural";
@@ -46,6 +55,57 @@ export default {
     }
   },
 };
+
+// ── Búsqueda web (DuckDuckGo HTML; si falla, Wikipedia en español) ──
+function jsonRes(obj) {
+  return new Response(JSON.stringify(obj), {
+    headers: Object.assign({ "Content-Type": "application/json; charset=utf-8" }, CORS),
+  });
+}
+function stripTags(s) {
+  return String(s || "").replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&").replace(/&#x27;/g, "'").replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ").trim();
+}
+async function webSearch(q) {
+  const out = [];
+  // 1) DuckDuckGo HTML (sin clave). Puede fallar desde IPs de datacenter → respaldo Wikipedia.
+  try {
+    const r = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q), {
+      headers: { "User-Agent": UA, "Accept-Language": "es-ES,es;q=0.9", "Accept": "text/html" },
+    });
+    const html = await r.text();
+    const re = /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+    let m;
+    while ((m = re.exec(html)) && out.length < 5) {
+      let href = m[1];
+      const u = href.match(/[?&]uddg=([^&]+)/);
+      if (u) href = decodeURIComponent(u[1]);
+      else if (href.indexOf("//") === 0) href = "https:" + href;
+      out.push({ title: stripTags(m[2]), url: href, snippet: "" });
+    }
+    const reS = /<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+    let s, i = 0;
+    while ((s = reS.exec(html)) && i < out.length) { out[i].snippet = stripTags(s[1]); i++; }
+  } catch (e) {}
+  // 2) Respaldo: Wikipedia (siempre con CORS y fiable para temas enciclopédicos).
+  if (!out.length) {
+    try {
+      const wr = await fetch("https://es.wikipedia.org/w/api.php?action=query&list=search&srlimit=4&format=json&srsearch=" + encodeURIComponent(q),
+        { headers: { "User-Agent": UA } });
+      const wj = await wr.json();
+      ((wj.query && wj.query.search) || []).forEach(function (it) {
+        out.push({
+          title: it.title,
+          url: "https://es.wikipedia.org/wiki/" + encodeURIComponent(it.title.replace(/ /g, "_")),
+          snippet: stripTags(it.snippet || ""),
+        });
+      });
+    } catch (e) {}
+  }
+  return out;
+}
 
 // SHA-256 hex en MAYÚSCULAS
 async function sha256Hex(str) {

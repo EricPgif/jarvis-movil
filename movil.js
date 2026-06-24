@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "2.8";
-  var WHATS_NEW = "Adiós al «código raro» al abrir apps o limpiar el chat; abro más apps (Discord, Instagram…); dock y barra de escribir ya no se cortan; chat más compacto; y en Modo Super el clima ya no tapa la X.";
+  var APP_VERSION = "2.9";
+  var WHATS_NEW = "¡Primer agente! Ahora puedo BUSCAR en internet y resumirte (noticias de hoy, datos en tiempo real). Lo uso solo cuando hace falta. (Requiere actualizar el Worker una vez.)";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -72,7 +72,7 @@
     busy = true;
     setState("thinking");
     var thinking = addMsg("…", "jv");
-    API.askMiniMax(text).then(function (reply) {
+    API.askMiniMax(text, function (status) { setMsg(thinking, "🔎 " + status); }).then(function (reply) {
       setMsg(thinking, reply || "(sin respuesta)");
       $("log").scrollTop = $("log").scrollHeight;
       var sl = $("super-log"); if (sl) sl.scrollTop = sl.scrollHeight;
