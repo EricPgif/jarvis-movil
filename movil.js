@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "2.7";
-  var WHATS_NEW = "Memoria inteligente (recuerdo lo importante de ti aunque borres el chat), auto-actualización fiable, WhatsApp/Telegram abren solo en su app, y entiendo «vuelve a abrirlo».";
+  var APP_VERSION = "2.8";
+  var WHATS_NEW = "Adiós al «código raro» al abrir apps o limpiar el chat; abro más apps (Discord, Instagram…); dock y barra de escribir ya no se cortan; chat más compacto; y en Modo Super el clima ya no tapa la X.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -52,6 +52,13 @@
     // Memoria inteligente: aprende hechos del mensaje (nombre, gustos, temas…). Embudo único.
     if (window.Mem) { try { window.Mem.capture(text); } catch (e) {} }
 
+    // ¿Pidió limpiar el chat? Se hace LOCALMENTE (antes lo mandaba a MiniMax y soltaba "código raro").
+    var nrm = window.Router ? window.Router.norm(text) : text.toLowerCase();
+    if (/\b(limpia|limpiar|borra|borrar|vacia|vaciar|resetea|resetear|elimina|eliminar)\b/.test(nrm) &&
+        /\b(chat|conversacion|charla|historial|mensajes|memoria)\b/.test(nrm)) {
+      clearChat(); return;
+    }
+
     // 1) ¿Acción local? (abrir app, Modo Super, Dexter, etc.)
     var routed = Router.routeCommand(text);
     if (routed.handled) {
@@ -81,6 +88,13 @@
     if (!text) { setState(""); return; }
     setState("speaking");
     Voice.speak(text, null, function () { setState(""); });
+  }
+
+  // Borra la conversación (chat normal + Super) PERO conserva los hechos de Eric (mm_facts).
+  function clearChat() {
+    if (window.API && window.API.clearHistory) window.API.clearHistory();
+    $("log").innerHTML = ""; var sl = $("super-log"); if (sl) sl.innerHTML = "";
+    addMsg("Conversación borrada, señor. Sigo recordando lo importante de usted.", "sys");
   }
 
   // ── Voz (micro) ──
@@ -214,13 +228,7 @@
     $("cfg-save").addEventListener("click", saveSettings);
     $("cfg-install").addEventListener("click", doInstall);
     $("cfg-update").addEventListener("click", forceUpdate);
-    $("cfg-clear").addEventListener("click", function () {
-      if (window.API && window.API.clearHistory) window.API.clearHistory();
-      $("log").innerHTML = ""; var sl = $("super-log"); if (sl) sl.innerHTML = "";
-      closeSettings();
-      // Borra SOLO la conversación; los hechos sobre Eric (mm_facts) se conservan.
-      addMsg("Conversación borrada, señor. Sigo recordando lo importante de usted.", "sys");
-    });
+    $("cfg-clear").addEventListener("click", function () { closeSettings(); clearChat(); });
     $("cfg-sfx").addEventListener("click", function () {
       if (!window.sfx) return;
       var on = !window.sfx.enabled; window.sfx.setEnabled(on);

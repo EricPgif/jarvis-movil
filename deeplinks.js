@@ -26,6 +26,15 @@
     chrome:     { frase: "Abriendo el navegador, señor.",  https: "https://www.google.com" },
     clima:      { frase: "Aquí tiene el tiempo, señor.",   https: "https://www.google.com/search?q=el+tiempo+hoy" },
     netflix:    { frase: "Abriendo Netflix, señor.",   https: "https://www.netflix.com" },
+    // Apps comunes (intenta la app y, si no está, cae a la web).
+    discord:    { frase: "Abriendo Discord, señor.",   scheme: "discord://",    https: "https://discord.com/app" },
+    instagram:  { frase: "Abriendo Instagram, señor.", scheme: "instagram://",  https: "https://instagram.com" },
+    tiktok:     { frase: "Abriendo TikTok, señor.",    scheme: "snssdk1233://", https: "https://www.tiktok.com" },
+    twitter:    { frase: "Abriendo X, señor.",         scheme: "twitter://",    https: "https://x.com" },
+    reddit:     { frase: "Abriendo Reddit, señor.",    scheme: "reddit://",     https: "https://reddit.com" },
+    twitch:     { frase: "Abriendo Twitch, señor.",    scheme: "twitch://",     https: "https://twitch.tv" },
+    maps:       { frase: "Abriendo Maps, señor.",      scheme: "geo:0,0",       https: "https://maps.google.com" },
+    mapas:      { frase: "Abriendo Maps, señor.",      scheme: "geo:0,0",       https: "https://maps.google.com" },
   };
 
   // Funciones solo-PC: no se pueden en el móvil. Mensaje honesto.

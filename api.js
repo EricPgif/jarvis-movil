@@ -41,6 +41,9 @@
     "- Habla NATURAL y conversacional: charla, opina, bromea si encaja, da consejos. Sin relleno, pero",
     "  tampoco respuestas secas; el punto justo. Sin emojis. Espanol de Espana.",
     "- Escribe SIEMPRE en alfabeto latino. NUNCA uses caracteres chinos, japoneses ni coreanos.",
+    "- NUNCA uses formato de herramientas, tool_call, invoke, parameter ni etiquetas XML/JSON; ni",
+    "  «<minimax:tool_call>» ni nada parecido. Responde SOLO con texto natural para Eric. Si te piden",
+    "  abrir una app o algo del móvil que no puedes ejecutar, dilo en una frase corta y natural.",
     "",
     "QUE PUEDES HACER EN ESTE MOVIL (dilo con naturalidad si viene a cuento):",
     "- Abrir apps del telefono: Spotify (musica), YouTube, WhatsApp, Telegram, correo, calendario,",
@@ -96,9 +99,24 @@
         var txt = "";
         (data.content || []).forEach(function (bl) { if (bl && bl.type === "text") txt += (bl.text || ""); });
         txt = txt.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "");
+        // MiniMax-M2 a veces intenta "tool calls" (aún NO soportados aquí) y los suelta como TEXTO
+        // (el "código raro": <minimax:tool_call><invoke ...>). Si pidió abrir una app, la abrimos de
+        // verdad; y SIEMPRE limpiamos ese markup para que NO se vea nunca.
+        try {
+          var iv = txt.match(/open_app[\s\S]*?name\s*=\s*["']?(?:app|name)["']?\s*>\s*([^<]+?)\s*<\/parameter>/i);
+          if (iv && window.Links && window.Links.openApp) {
+            var said = window.Links.openApp(iv[1].trim().toLowerCase());
+            if (said) txt = said;
+          }
+        } catch (e) {}
+        txt = txt.replace(/<minimax:tool_call>[\s\S]*?<\/minimax:tool_call>/gi, "");
+        txt = txt.replace(/<invoke\b[\s\S]*?<\/invoke>/gi, "");
+        txt = txt.replace(/<parameter\b[\s\S]*?<\/parameter>/gi, "");
+        txt = txt.replace(/<\/?(?:minimax:)?(?:tool_call|invoke|parameter)\b[^>]*>/gi, "");
         // MiniMax a veces cuela caracteres chinos/japoneses/coreanos aunque hable español → fuera.
         txt = txt.replace(/[　-〿぀-ヿ㐀-䶿一-鿿가-힯豈-﫿＀-￯]/g, "");
         txt = txt.replace(/[ \t]{2,}/g, " ").trim();
+        if (!txt) txt = "A su servicio, señor.";   // si solo había markup, no dejes el globo vacío
         history.push({ role: "assistant", content: txt });
         saveHist();   // recordar la conversación (memoria)
         return txt;

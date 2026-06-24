@@ -40,8 +40,9 @@
   .sup-hud{position:absolute;font-size:10px;letter-spacing:1px;color:var(--text-dim);text-transform:uppercase;z-index:3;}
   .sup-tl{top:calc(12px + env(safe-area-inset-top));left:16px;}
   .sup-tl .t{font-size:22px;font-weight:700;color:#eafaff;letter-spacing:1px;font-variant-numeric:tabular-nums;}
-  .sup-tr{top:calc(12px + env(safe-area-inset-top));right:16px;text-align:right;}
-  .sup-tr .wx{font-size:20px;font-weight:700;color:#eafaff;}
+  .sup-tr{top:calc(12px + env(safe-area-inset-top));right:16px;text-align:right;max-width:38vw;}
+  .sup-tr .wx{font-size:20px;font-weight:700;color:#eafaff;white-space:nowrap;}
+  #sup-wx-desc{white-space:normal;line-height:1.25;}
   .sup-bl{bottom:calc(96px + env(safe-area-inset-bottom));left:16px;}
   .sup-br{bottom:calc(96px + env(safe-area-inset-bottom));right:16px;text-align:right;color:var(--cyan);}
   .sup-close{position:absolute;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
