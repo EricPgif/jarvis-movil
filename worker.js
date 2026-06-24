@@ -114,34 +114,43 @@ async function synth(text, voice, rate, pitch) {
   const ws = resp.webSocket;
   if (!ws) throw new Error("sin WebSocket (status " + resp.status + ")");
   ws.accept();
+  try { ws.binaryType = "arraybuffer"; } catch (e) {}
 
   return await new Promise((resolve, reject) => {
     const chunks = [];
     let done = false, gotMsg = 0;
+    let chain = Promise.resolve(); // procesar mensajes EN ORDEN (el binario puede ser Blob → async)
     const fail = (m) => { if (!done) { done = true; clearTimeout(timer); try { ws.close(); } catch (e) {} reject(new Error(m)); } };
+    const finish = () => {
+      done = true; clearTimeout(timer); try { ws.close(); } catch (e) {}
+      if (!chunks.length) return reject(new Error("sin audio"));
+      let total = 0; chunks.forEach((c) => (total += c.length));
+      const out = new Uint8Array(total); let off = 0;
+      chunks.forEach((c) => { out.set(c, off); off += c.length; });
+      resolve(out);
+    };
     const timer = setTimeout(() => fail("timeout (msgs=" + gotMsg + ")"), 15000);
 
     ws.addEventListener("message", (ev) => {
-      gotMsg++;
-      try {
-        const d = ev.data;
+      const d = ev.data;
+      chain = chain.then(async () => {
+        if (done) return;
+        gotMsg++;
         if (typeof d === "string") {
-          if (d.includes("Path:turn.end")) {
-            done = true; clearTimeout(timer); try { ws.close(); } catch (e) {}
-            if (!chunks.length) return reject(new Error("sin audio"));
-            let total = 0; chunks.forEach((c) => (total += c.length));
-            const out = new Uint8Array(total); let off = 0;
-            chunks.forEach((c) => { out.set(c, off); off += c.length; });
-            resolve(out);
-          }
-        } else {
-          // binario: [2 bytes len cabecera big-endian][cabecera][audio]
-          const buf = d instanceof ArrayBuffer ? d : d.buffer;
-          const dv = new DataView(buf);
-          const headerLen = dv.getUint16(0);
-          chunks.push(new Uint8Array(buf, 2 + headerLen));
+          if (d.includes("Path:turn.end")) finish();
+          return;
         }
-      } catch (err) { fail("parse: " + (err && err.message)); }
+        // binario: [2 bytes len cabecera big-endian][cabecera][audio]
+        // Cloudflare puede entregarlo como ArrayBuffer, typed array o Blob.
+        let ab;
+        if (d instanceof ArrayBuffer) ab = d;
+        else if (ArrayBuffer.isView(d)) ab = d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength);
+        else if (d && typeof d.arrayBuffer === "function") ab = await d.arrayBuffer(); // Blob
+        else throw new Error("tipo binario " + Object.prototype.toString.call(d));
+        const dv = new DataView(ab);
+        const headerLen = dv.getUint16(0);
+        chunks.push(new Uint8Array(ab, 2 + headerLen));
+      }).catch((err) => fail("parse: " + (err && err.message)));
     });
     ws.addEventListener("close", (ev) => { if (!done) fail("cerrado code=" + (ev && ev.code) + " reason=" + (ev && ev.reason) + " msgs=" + gotMsg); });
     ws.addEventListener("error", (ev) => fail("ws error: " + (ev && (ev.message || (ev.error && ev.error.message) || "")) + " msgs=" + gotMsg));
