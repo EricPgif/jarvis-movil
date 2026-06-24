@@ -69,6 +69,19 @@ function randHex(bytes) {
 function connectId() { return randHex(16); }            // 32 hex (ConnectionId)
 function muid() { return randHex(16).toUpperCase(); }    // 32 hex MAYÚS (cookie muid)
 
+// X-Timestamp en el formato EXACTO que usa edge-tts (no ISO):
+// "Wed Jun 24 2026 12:00:00 GMT+0000 (Coordinated Universal Time)". Un formato distinto
+// hace que Microsoft cierre la conexión (era la causa del "ws error").
+function tsHeader() {
+  const d = new Date();
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const mons = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const p = (n) => String(n).padStart(2, "0");
+  return days[d.getUTCDay()] + " " + mons[d.getUTCMonth()] + " " + p(d.getUTCDate()) + " " +
+    d.getUTCFullYear() + " " + p(d.getUTCHours()) + ":" + p(d.getUTCMinutes()) + ":" + p(d.getUTCSeconds()) +
+    " GMT+0000 (Coordinated Universal Time)";
+}
+
 // Abre el WebSocket de síntesis con las cabeceras exactas que exige Microsoft.
 async function openWS(skewMs) {
   const gec = await secMsGec(skewMs);
@@ -104,44 +117,46 @@ async function synth(text, voice, rate, pitch) {
 
   return await new Promise((resolve, reject) => {
     const chunks = [];
-    let done = false;
-    const fail = (m) => { if (!done) { done = true; try { ws.close(); } catch (e) {} reject(new Error(m)); } };
-    const timer = setTimeout(() => fail("timeout"), 15000);
+    let done = false, gotMsg = 0;
+    const fail = (m) => { if (!done) { done = true; clearTimeout(timer); try { ws.close(); } catch (e) {} reject(new Error(m)); } };
+    const timer = setTimeout(() => fail("timeout (msgs=" + gotMsg + ")"), 15000);
 
     ws.addEventListener("message", (ev) => {
-      const d = ev.data;
-      if (typeof d === "string") {
-        if (d.includes("Path:turn.end")) {
-          done = true; clearTimeout(timer); try { ws.close(); } catch (e) {}
-          if (!chunks.length) return reject(new Error("sin audio"));
-          let total = 0; chunks.forEach((c) => (total += c.length));
-          const out = new Uint8Array(total); let off = 0;
-          chunks.forEach((c) => { out.set(c, off); off += c.length; });
-          resolve(out);
+      gotMsg++;
+      try {
+        const d = ev.data;
+        if (typeof d === "string") {
+          if (d.includes("Path:turn.end")) {
+            done = true; clearTimeout(timer); try { ws.close(); } catch (e) {}
+            if (!chunks.length) return reject(new Error("sin audio"));
+            let total = 0; chunks.forEach((c) => (total += c.length));
+            const out = new Uint8Array(total); let off = 0;
+            chunks.forEach((c) => { out.set(c, off); off += c.length; });
+            resolve(out);
+          }
+        } else {
+          // binario: [2 bytes len cabecera big-endian][cabecera][audio]
+          const buf = d instanceof ArrayBuffer ? d : d.buffer;
+          const dv = new DataView(buf);
+          const headerLen = dv.getUint16(0);
+          chunks.push(new Uint8Array(buf, 2 + headerLen));
         }
-      } else {
-        // binario: [2 bytes len cabecera big-endian][cabecera][audio]
-        const buf = d instanceof ArrayBuffer ? d : d.buffer;
-        const dv = new DataView(buf);
-        const headerLen = dv.getUint16(0);
-        chunks.push(new Uint8Array(buf, 2 + headerLen));
-      }
+      } catch (err) { fail("parse: " + (err && err.message)); }
     });
-    ws.addEventListener("close", () => { if (!done) fail("cerrado sin turn.end"); });
-    ws.addEventListener("error", () => fail("ws error"));
+    ws.addEventListener("close", (ev) => { if (!done) fail("cerrado code=" + (ev && ev.code) + " reason=" + (ev && ev.reason) + " msgs=" + gotMsg); });
+    ws.addEventListener("error", (ev) => fail("ws error: " + (ev && (ev.message || (ev.error && ev.error.message) || "")) + " msgs=" + gotMsg));
 
-    const ts = new Date().toISOString();
-    // 1) config de audio (MP3)
+    // 1) config de audio (MP3) — termina en \r\n como edge-tts
     ws.send(
-      `X-Timestamp:${ts}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n` +
-      `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`
+      `X-Timestamp:${tsHeader()}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n` +
+      `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n`
     );
-    // 2) SSML con la voz
+    // 2) SSML con la voz (edge-tts añade una "Z" tras el timestamp aquí)
     const ssml =
       `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='es-ES'>` +
       `<voice name='${voice}'><prosody pitch='${pitch}' rate='${rate}' volume='+0%'>${xmlEscape(text)}</prosody></voice></speak>`;
     ws.send(
-      `X-RequestId:${connectId()}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${ts}Z\r\nPath:ssml\r\n\r\n${ssml}`
+      `X-RequestId:${connectId()}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${tsHeader()}Z\r\nPath:ssml\r\n\r\n${ssml}`
     );
   });
 }
