@@ -96,7 +96,7 @@
       listening = false; if (_onState) _onState(false);
       if (_onResult) _onResult(t);
     };
-    rec.onend = function () { clearGuard(); listening = false; if (_onState) _onState(false); try { if (window.Clap) window.Clap.resume(); } catch (e) {} };
+    rec.onend = function () { clearGuard(); listening = false; if (_onState) _onState(false); try { if (window.Clap) window.Clap.resume(); } catch (e) {} resumeWake(); };
     rec.onerror = function (e) {
       clearGuard(); listening = false; if (_onState) _onState(false);
       if (_onError) _onError((e && e.error) || "error");
@@ -109,6 +109,7 @@
     if (listening) { try { rec.stop(); } catch (e) {} return { ok: true, stopped: true }; }
     cancel();
     try { if (window.Clap) window.Clap.pause(); } catch (e) {}   // suelta el micro de la palmada para poder escuchar
+    pauseWake();   // y el wake continuo (un solo reconocedor puede usar el micro a la vez)
     try {
       rec.start(); listening = true; if (onState) onState(true);
       // Anti-cuelgue: si en 10 s no llega resultado ni fin (pasa en algunos móviles/PWA
@@ -127,11 +128,14 @@
   function stopListen() { if (rec && listening) { try { rec.stop(); } catch (e) {} } }
   function isListening() { return listening; }
 
-  // ── Wake word "Jarvis" (escucha CONTINUA; solo se usa en Modo Super) ──
+  // ── Wake word "Jarvis" (escucha CONTINUA; solo se usa en Modo Super; BEST-EFFORT) ──
+  // En la PWA instalada de Android el reconocimiento continuo suele fallar (InvalidStateError /
+  // onend inmediato). Por eso es solo un EXTRA: el camino fiable para hablar es TOCAR la esfera
+  // (one-shot 'rec', el mismo que va en modo normal). El wake se pausa solo cuando se toca.
   var WSR = window.SpeechRecognition || window.webkitSpeechRecognition;
   var wrec = null;
   if (WSR) { try { wrec = new WSR(); wrec.lang = "es-ES"; wrec.continuous = true; wrec.interimResults = true; wrec.maxAlternatives = 1; } catch (e) { wrec = null; } }
-  var wakeOn = false, capturing = false, lastCmd = 0, _onCmd = null, _onWS = null;
+  var wakeOn = false, capturing = false, lastCmd = 0, _onCmd = null, _onWS = null, wakeFails = 0;
   function wnorm(s) { return (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
   function wstart() { if (wakeOn && wrec) { try { wrec.start(); } catch (e) {} } }
   function fire(cmd) {
@@ -142,27 +146,41 @@
     if (_onWS) _onWS("idle");
     if (_onCmd) _onCmd(cmd);
   }
+  // Manejadores con nombre (para poder pausar/reanudar el wake sin perder la configuración).
+  function wakeOnResult(e) {
+    wakeFails = 0;
+    var r = e.results[e.results.length - 1];
+    var t = wnorm(r[0].transcript);
+    if (capturing) { if (r.isFinal) fire(t); return; }       // ya en captura → la orden es esto
+    var i = t.lastIndexOf("jarvis");
+    if (i === -1) return;
+    var after = t.slice(i + 6).trim();
+    if (after.length >= 2) { if (r.isFinal) fire(after); }    // "jarvis abre spotify"
+    else { capturing = true; if (_onWS) _onWS("listening"); } // solo "jarvis" → capturar la orden
+  }
+  function wakeOnEnd() { if (wakeOn) setTimeout(wstart, 350); }   // Android corta solo → reiniciar
+  function wakeOnError(e) {
+    var err = (e && e.error) || "";
+    // 'no-speech'/'aborted' son normales en el bucle. 'not-allowed'/'service-not-allowed' = sin permiso.
+    if (err === "not-allowed" || err === "service-not-allowed") { wakeOn = false; return; }
+    if (err === "no-speech" || err === "aborted") return;      // el onend reinicia
+    if (++wakeFails >= 5) { wakeOn = false; }                  // PWA donde el continuo no va → parar de insistir (la esfera sí funciona)
+  }
   function startWake(onCommand, onState) {
     if (!wrec) { if (onState) onState("unsupported"); return false; }
-    _onCmd = onCommand; _onWS = onState; wakeOn = true; capturing = false;
+    _onCmd = onCommand; _onWS = onState; wakeOn = true; capturing = false; wakeFails = 0;
     try { if (window.Clap) window.Clap.pause(); } catch (e) {}   // el wake necesita el micro en exclusiva
-    wrec.onresult = function (e) {
-      var r = e.results[e.results.length - 1];
-      var t = wnorm(r[0].transcript);
-      if (capturing) { if (r.isFinal) fire(t); return; }       // ya en captura → la orden es esto
-      var i = t.lastIndexOf("jarvis");
-      if (i === -1) return;
-      var after = t.slice(i + 6).trim();
-      if (after.length >= 2) { if (r.isFinal) fire(after); }    // "jarvis abre spotify"
-      else { capturing = true; if (_onWS) _onWS("listening"); } // solo "jarvis" → capturar la orden
-    };
-    wrec.onend = function () { if (wakeOn) setTimeout(wstart, 250); };   // Android corta solo → reiniciar
-    wrec.onerror = function () { /* el onend reinicia */ };
+    wrec.onresult = wakeOnResult; wrec.onend = wakeOnEnd; wrec.onerror = wakeOnError;
     wstart();
     return true;
   }
-  function stopWake() { wakeOn = false; capturing = false; if (wrec) { try { wrec.onend = null; wrec.onresult = null; wrec.abort(); } catch (e) {} } try { if (window.Clap) window.Clap.resume(); } catch (e) {} }
-  function wakeCapture() { if (!wrec) return false; capturing = true; if (_onWS) _onWS("listening"); wstart(); return true; }  // clic esfera
+  function stopWake() { wakeOn = false; capturing = false; if (wrec) { try { wrec.onend = null; wrec.onresult = null; wrec.onerror = null; wrec.abort(); } catch (e) {} } try { if (window.Clap) window.Clap.resume(); } catch (e) {} }
+  // Pausa el wake continuo para ceder el micro al one-shot (y lo reanuda después).
+  function pauseWake() { if (wrec && wakeOn) { try { wrec.onend = null; wrec.onresult = null; wrec.onerror = null; wrec.abort(); } catch (e) {} } }
+  function resumeWake() { if (wrec && wakeOn) { try { wrec.onresult = wakeOnResult; wrec.onend = wakeOnEnd; wrec.onerror = wakeOnError; setTimeout(wstart, 400); } catch (e) {} } }
+  // Clic en la esfera del Super: si el wake continuo está vivo, lo usa para capturar; si no, el
+  // que llama (super.js) usará el one-shot fiable (toggleListen).
+  function wakeCapture() { if (!wrec || !wakeOn) return false; capturing = true; if (_onWS) _onWS("listening"); wstart(); return true; }
 
   window.Voice = {
     speak: speak, cancel: cancel, unlock: unlock,

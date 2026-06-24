@@ -152,11 +152,32 @@
     d.addEventListener("click", function (e) { if (e.target === d) d.classList.remove("show"); });
   }
 
-  // ── La esfera = micrófono ──
+  // ── La esfera = micrófono. Tocarla SIEMPRE escucha por el camino fiable (one-shot, el mismo
+  //    que va en modo normal). El wake «Jarvis» continuo es solo un extra (falla en PWA Android). ──
   function micTap() {
-    if (window.Voice && window.Voice.wakeSupported && window.Voice.wakeSupported()) {
-      window.Voice.wakeCapture();
-    } else if (window.APP && window.APP.mic) { window.APP.mic(); }
+    if (!window.Voice) return;
+    // Resetea cualquier estado atascado (p.ej. "HABLANDO" que no se limpió) antes de escuchar.
+    try { window.Voice.cancel(); } catch (e) {}
+    if (window.APP && window.APP.setState) window.APP.setState("");
+    if (!window.Voice.sttSupported) {
+      onWakeState("unsupported"); return;
+    }
+    // Si ya está escuchando, un segundo toque corta.
+    if (window.Voice.isListening && window.Voice.isListening()) { try { window.Voice.stopListen(); } catch (e) {} return; }
+    window.Voice.toggleListen(
+      function (t) { onWakeState("idle"); if (window.APP) window.APP.handle(t); },
+      function (on) { onWakeState(on ? "listening" : "idle"); },
+      function (err) {
+        onWakeState("idle");
+        if (err === "aborted") return;
+        var msg = (err === "not-allowed" || err === "service-not-allowed")
+            ? "Permiso de micrófono denegado, señor. Toca el candado 🔒 → Micrófono → Permitir."
+          : err === "no-speech" ? "No te he oído, señor. Toca la esfera y repite."
+          : (err === "network" || err === "timeout") ? "El micro no respondió, señor. En la app instalada el dictado a veces falla: ábrela en Chrome."
+          : "El dictado no funcionó (" + err + "), señor.";
+        if (window.APP) APP.addMsg(msg, "sys");
+      }
+    );
   }
   function onWakeState(state) {
     var s = $("sup-status");

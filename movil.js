@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "4.2";
-  var WHATS_NEW = "La VOZ vuelve a funcionar en modo normal Y en Modo Super (toca la esfera o di «Jarvis»). Las apps giran suaves, sin tirones. Y al abrir una app se abre SOLO la app, nunca la web. Logos nuevos: Steam, Epic Games, Cámara y Agenda.";
+  var APP_VERSION = "4.3";
+  var WHATS_NEW = "¡Ya puedo CREAR IMÁGENES! Dime «hazme una imagen de un gato» y la genero con MiniMax. Y la voz del Modo Super arreglada: toca la esfera y háblame (ya no se queda colgado en «HABLANDO»). NOTA: para las imágenes hay que volver a desplegar el Worker una vez.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -36,6 +36,20 @@
     if (el._mirror) { el._mirror.classList.remove("agent"); el._mirror.textContent = text; }
   }
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  // Pinta una imagen generada en el chat (y la espeja en el Super). Tocar la imagen la abre a tamaño
+  // completo (mantén pulsado → guardar). El enlace «Abrir/Descargar» también la abre.
+  function addImage(url, caption) {
+    var safe = encodeURI(String(url));
+    var html = '<img class="genimg" src="' + safe + '" alt="' + escapeHtml(caption || "imagen") + '" loading="lazy">' +
+      '<a class="img-dl" href="' + safe + '" target="_blank" rel="noopener" download="jarvis-imagen.png">⬇ Abrir / Descargar</a>';
+    var d = document.createElement("div");
+    d.className = "msg jv img";
+    d.innerHTML = html;
+    var log = $("log"); log.appendChild(d); log.scrollTop = log.scrollHeight;
+    var slog = $("super-log");
+    if (slog) { var c = d.cloneNode(true); slog.appendChild(c); slog.scrollTop = slog.scrollHeight; }
+    return d;
+  }
   // Convierte un globo en una tarjeta de "agente trabajando" (reactor girando + texto + puntos).
   function setAgent(el, label) {
     if (!el) return;
@@ -45,9 +59,13 @@
   }
   function setState(s) {   // '', 'listening', 'speaking', 'thinking'
     Sphere.setMode(s === "thinking" ? "processing" : (s || "idle"));
-    $("m-status").textContent =
-      s === "listening" ? "ESCUCHANDO" : s === "speaking" ? "HABLANDO" :
+    var label = s === "listening" ? "ESCUCHANDO" : s === "speaking" ? "HABLANDO" :
       s === "thinking" ? "PROCESANDO…" : "EN LÍNEA";
+    $("m-status").textContent = label;
+    // Refleja el estado en el Modo Super (su esfera reacciona y su barra de estado).
+    if (window.__superActive) {
+      var ss = $("sup-status"); if (ss) ss.textContent = (s === "listening" ? "ESCUCHANDO…" : label);
+    }
   }
 
   // ── Núcleo: procesar una orden (de voz o texto) ──
@@ -65,6 +83,30 @@
     if (/\b(limpia|limpiar|borra|borrar|vacia|vaciar|resetea|resetear|elimina|eliminar)\b/.test(nrm) &&
         /\b(chat|conversacion|charla|historial|mensajes|memoria)\b/.test(nrm)) {
       clearChat(); return;
+    }
+
+    // 0) ¿Pide CREAR UNA IMAGEN? → la generamos con MiniMax (image-01) vía el Worker, sin pasar por
+    //    el modelo de texto (que diría "soy solo texto"). Mostramos la imagen en el chat.
+    var imgPrompt = (window.API && window.API.asImagePrompt) ? window.API.asImagePrompt(text) : null;
+    if (imgPrompt) {
+      if (!CFG.key) { addMsg("Falta tu API key de MiniMax, señor. Pulsa el engranaje ⚙.", "jv"); openSettings(); return; }
+      busy = true; setState("thinking");
+      var icard = addMsg("…", "jv");
+      setAgent(icard, "Creando tu imagen: " + imgPrompt.slice(0, 40));
+      API.generateImage(imgPrompt, API.imageAspect ? API.imageAspect(text) : "1:1").then(function (urls) {
+        busy = false; setState("");
+        if (urls && urls.length) {
+          setMsg(icard, "Aquí tiene su imagen, señor.");
+          urls.forEach(function (u) { addImage(u, imgPrompt); });
+          speak("Aquí tiene su imagen, señor.");
+        } else {
+          setMsg(icard, "No he podido generar la imagen, señor. Inténtelo de nuevo.");
+        }
+      }).catch(function (e) {
+        busy = false; setState("");
+        setMsg(icard, "No pude generar la imagen, señor: " + (e && e.message || e));
+      });
+      return;
     }
 
     // 1) ¿Acción local? (abrir app, Modo Super, Dexter, etc.)
@@ -92,10 +134,18 @@
     });
   }
 
+  var _speakSafety = null;
   function speak(text) {
+    if (_speakSafety) { clearTimeout(_speakSafety); _speakSafety = null; }
     if (!text) { setState(""); return; }
     setState("speaking");
-    Voice.speak(text, null, function () { setState(""); });
+    var done = false;
+    var clear = function () { if (done) return; done = true; if (_speakSafety) { clearTimeout(_speakSafety); _speakSafety = null; } setState(""); };
+    // Red de seguridad: si el TTS no dispara onend (pasa en la PWA instalada), el estado "HABLANDO"
+    // se quedaba pegado y NO se podía volver a hablar. Lo soltamos solo tras un máximo estimado.
+    var ms = Math.min(30000, Math.max(6000, text.length * 90));
+    _speakSafety = setTimeout(clear, ms);
+    Voice.speak(text, null, clear);
   }
 
   // Borra la conversación ACTIVA (chat normal + Super) PERO conserva los hechos de Eric (mm_facts).

@@ -281,6 +281,62 @@
     saveHist();
   }
 
+  // ── GENERACIÓN DE IMÁGENES (MiniMax image-01 vía el Worker; el navegador no puede directo: CORS) ──
+  // ¿El mensaje pide CREAR una imagen? Devuelve el prompt (la descripción) o null.
+  function asImagePrompt(text) {
+    var raw = (text || "").trim();
+    if (!raw) return null;
+    var n = " " + raw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") + " ";
+    var noun = /\b(imagen|imagenes|foto|fotos|fotografia|dibujo|dibujos|ilustracion|ilustraciones|logo|logotipo|wallpaper|fondo de pantalla|render|poster|cartel|avatar|retrato|arte|wallpapers|imagina(te)?)\b/;
+    var verb = /\b(haz|hazme|hazle|haces|hacer|hacerme|crea|creame|crea me|genera|generame|gener|dibuja|dibujame|pinta|pintame|disena|disename|quiero|necesito|ponme|muestrame|enseiame|ensename|dame|generar|crear|disenar|dibujar)\b/;
+    var drawVerb = /\b(dibuja|dibujame|pintame|pinta|ilustra|ilustrame)\b/;
+    if (!(drawVerb.test(n) || (noun.test(n) && verb.test(n)))) return null;
+    // Quita SOLO el mando del principio ("hazme/créame/genera/dibuja…") y pasa el resto tal cual.
+    // "una imagen de un gato", "un logo para una barbería" son prompts válidos para image-01.
+    var p = raw.trim()
+      .replace(/^[¿¡\s]+/, "")
+      .replace(/^(?:oye|venga|por favor|porfa|jarvis)[\s,]+/i, "")
+      .replace(/^(?:me\s+)?(?:puedes?\s+|podrias?\s+)?(?:haz(?:me|le)?|haces|hacer(?:me)?|cr[eé][ae](?:me)?|gener[ae](?:me)?|g[eé]ner[ae]me|dibuj[ae](?:me)?|dib[uú]jame|pint[ae](?:me)?|p[ií]ntame|imagina(?:te)?|dis[eé][nñ][ae](?:me)?|quiero|necesito|ponme|dame|mu[eé]strame|ens[eé][nñ]ame|generar|crear|dise[nñ]ar|dibujar|ilustra(?:me)?)\s+/i, "")
+      .replace(/^[\s:,.\-]+/, "")
+      .trim();
+    if (p.length < 2) p = raw;   // si quedó vacío, usa el texto original (image-01 lo entiende igual)
+    return p.slice(0, 1400);
+  }
+  // Relación de aspecto según pistas del texto.
+  function imageAspect(text) {
+    var n = (text || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    if (/\b(fondo de pantalla|wallpaper|vertical|movil|story|stories|tiktok|9:16)\b/.test(n)) return "9:16";
+    if (/\b(horizontal|panoramic|banner|portada|16:9|paisaje|cinematic)\b/.test(n)) return "16:9";
+    if (/\b(cuadrad|1:1|perfil|avatar)\b/.test(n)) return "1:1";
+    return "1:1";
+  }
+  // Genera la imagen llamando al Worker (/image), que añade la key y llama a MiniMax server-side.
+  function generateImage(prompt, aspect) {
+    if (!CFG.key) return Promise.reject(new Error("Falta la API key, señor."));
+    if (!prompt) return Promise.reject(new Error("Sin descripción para la imagen."));
+    var url = workerBase() + "/image";
+    var ctrl, to;
+    try { ctrl = new AbortController(); to = setTimeout(function () { ctrl.abort(); }, 90000); } catch (e) {}
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: prompt, aspect_ratio: aspect || "1:1", n: 1, key: CFG.key }),
+      signal: ctrl && ctrl.signal,
+    }).then(function (r) {
+      if (to) clearTimeout(to);
+      return r.text().then(function (txt) {
+        var d = null; try { d = JSON.parse(txt); } catch (e) {}
+        if (!d) throw new Error("El Worker aún no tiene la función de imágenes. Vuelve a desplegar worker.js en Cloudflare, señor.");
+        if (d.error) throw new Error(d.error);
+        return d.images || [];
+      });
+    }).catch(function (err) {
+      if (to) clearTimeout(to);
+      if (err && err.name === "AbortError") throw new Error("La imagen tardó demasiado, señor. Inténtelo otra vez.");
+      throw err;
+    });
+  }
+
   // ── API de conversaciones ──
   function listConvos() {
     return STORE.convos.map(function (c) {
@@ -309,6 +365,7 @@
   window.CFG = CFG;
   window.API = {
     askMiniMax: askMiniMax, SYSTEM: SYSTEM, addExchange: addExchange,
+    asImagePrompt: asImagePrompt, imageAspect: imageAspect, generateImage: generateImage,
     getHistory: function () { return H().slice(); },     // para mostrar el chat pasado
     clearHistory: function () { active().history.length = 0; saveStore(); },   // limpia SOLO la conversación activa
     // conversaciones

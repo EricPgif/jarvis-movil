@@ -35,6 +35,38 @@ export default {
       catch (e) { return jsonRes({ results: [], error: String((e && e.message) || e) }); }
     }
 
+    // ── Generación de IMÁGENES: MiniMax image-01 (el navegador no puede directo por CORS y
+    //    expondría la key). El móvil POSTea { prompt, aspect_ratio, n, key }; aquí llamamos a
+    //    MiniMax con la key y devolvemos las URLs con CORS. ──
+    if (url.pathname === "/image") {
+      let prompt = "", aspect = "1:1", n = 1, mmKey = "";
+      try {
+        const body = await request.json();
+        prompt = String((body && body.prompt) || "").trim().slice(0, 1400);
+        aspect = String((body && body.aspect_ratio) || "1:1");
+        n = Math.max(1, Math.min(9, parseInt((body && body.n) || 1, 10) || 1));
+        mmKey = String((body && body.key) || "").trim();
+      } catch (e) {}
+      if (!mmKey)  return jsonRes({ error: "Falta la API key." });
+      if (!prompt) return jsonRes({ error: "Falta la descripción de la imagen." });
+      try {
+        const mmRes = await fetch("https://api.minimax.io/v1/image_generation", {
+          method: "POST",
+          headers: { "Authorization": "Bearer " + mmKey, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: "image-01", prompt, aspect_ratio: aspect, response_format: "url", n, prompt_optimizer: true }),
+        });
+        const data = await mmRes.json();
+        const urls = (data && data.data && (data.data.image_urls || data.data.image_base64)) || [];
+        const ok = mmRes.ok && (!data.base_resp || data.base_resp.status_code === 0);
+        if (!ok || !urls.length) {
+          return jsonRes({ error: (data && data.base_resp && data.base_resp.status_msg) || ("MiniMax error " + mmRes.status) });
+        }
+        return jsonRes({ images: urls });
+      } catch (e) {
+        return jsonRes({ error: "No se pudo generar la imagen: " + String((e && e.message) || e) });
+      }
+    }
+
     if (url.pathname !== "/tts" && url.pathname !== "/") {
       return new Response("JARVIS Worker. Usa /tts?text=... o /search?q=...", { status: 404, headers: CORS });
     }
