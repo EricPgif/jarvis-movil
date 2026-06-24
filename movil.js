@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "4.3";
-  var WHATS_NEW = "¡Ya puedo CREAR IMÁGENES! Dime «hazme una imagen de un gato» y la genero con MiniMax. Y la voz del Modo Super arreglada: toca la esfera y háblame (ya no se queda colgado en «HABLANDO»). NOTA: para las imágenes hay que volver a desplegar el Worker una vez.";
+  var APP_VERSION = "4.4";
+  var WHATS_NEW = "Imágenes: «hazme una imagen de un gato» (ahora intenta sin el Worker). Modo Super sin el «tic» del micro: la escucha continua «Jarvis» está apagada por defecto (tócale la esfera; puedes activarla en Ajustes). Y las apps abren la APP directa, ya no la Play Store.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -251,6 +251,7 @@
     if (window.Extras) window.Extras.init();   // Comandos / Mis Apps / Diagnóstico
     if (window.sfx) $("cfg-sfx").classList.toggle("on", window.sfx.enabled);
     $("cfg-clap").classList.toggle("on", CFG.clap);
+    $("cfg-wake").classList.toggle("on", CFG.wake);
     var vl = $("ver-label"); if (vl) vl.textContent = "JARVIS móvil · v" + APP_VERSION;
     $("modal").classList.add("show");
   }
@@ -349,6 +350,14 @@
       if (on) { if (window.Clap) window.Clap.start(); }              // arranca aquí (gesto → permite el micro)
       else { if (window.Clap) window.Clap.stop(); }
     });
+    $("cfg-wake").addEventListener("click", function () {
+      var on = !CFG.wake; CFG.wake = on; this.classList.toggle("on", on);
+      // Si el Super está abierto, aplica el cambio al momento.
+      if (window.Voice) {
+        if (on && window.__superActive && window.Voice.startWake) { try { window.Voice.startWake(function (cmd) { if (window.APP) window.APP.handle(cmd); }, function () {}); } catch (e) {} }
+        else if (!on && window.Voice.stopWake) { try { window.Voice.stopWake(); } catch (e) {} }
+      }
+    });
     $("btn-super").addEventListener("click", function () { Voice.unlock(); if (window.Super) window.Super.show(); });
     $("moon").addEventListener("click", function () { if (window.Standby) window.Standby.show(); });
     window.addEventListener("online", refreshOnline);
@@ -408,14 +417,13 @@
           return;
         }
         try { sessionStorage.setItem("jv_update_tried", served); } catch (e) {}
-        if (_swReg) {                                            // empuja el SW nuevo → controllerchange recarga solo
-          _swReg.update().then(function () {
-            if (_swReg.waiting) { try { _swReg.waiting.postMessage("skipWaiting"); } catch (e) {} }
-          }).catch(function () {});
-          setTimeout(function () { try { window.location.reload(); } catch (e) {} }, 1500);
-        } else {
-          try { window.location.reload(); } catch (e) {}
-        }
+        // Actualización AGRESIVA: borra las cachés (así la recarga trae los archivos NUEVOS, no los
+        // viejos de la caché) + empuja el SW nuevo + recarga. Es la palanca fiable para que llegue.
+        var finish = function () { try { window.location.reload(); } catch (e) {} };
+        var jobs = [];
+        try { if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); })); } catch (e) {}
+        if (_swReg) { try { _swReg.update().then(function () { if (_swReg.waiting) { try { _swReg.waiting.postMessage("skipWaiting"); } catch (e) {} } }).catch(function () {}); } catch (e) {} }
+        Promise.all(jobs).then(function () { setTimeout(finish, 800); }).catch(function () { setTimeout(finish, 800); });
       }).catch(function () {});
   }
   function notifyVersion() {

@@ -47,12 +47,14 @@
            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   }
 
-  // Abre SOLO la app nativa en Android con un intent (sin browser_fallback_url → si no está
-  // la app, el sistema avisa y NO abre la web). Es lo fiable en Android/MIUI.
+  // Lanza la app por su actividad LAUNCHER (MAIN). Con browser_fallback_url: si la app NO está,
+  // va a la WEB (no a la Play Store). Es el respaldo para apps SIN esquema nativo (YouTube, etc.).
+  // (Las apps con esquema usan el esquema directo en openDirect, que nunca pasa por Play Store.)
   function openAndroidIntent(a) {
-    // Lanza la app por su actividad LAUNCHER (MAIN) → abre la pantalla principal directamente.
-    // (Con scheme+package, WhatsApp no resolvía y Android abría la Play Store.)
-    var url = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=" + a.android + ";end";
+    var web = a.web || a.https || "";
+    var url = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=" + a.android + ";" +
+              ((web && !a.appOnly) ? ("S.browser_fallback_url=" + encodeURIComponent(web) + ";") : "") +
+              "end";
     try { window.location.href = url; } catch (e) {}
   }
 
@@ -93,10 +95,16 @@
   // lanza la APP por su launcher (SOLO app, nunca web). Si no, scheme y, si toca, respaldo web.
   function openDirect(d) {
     if (!d) return;
-    var fb = d.web || d.https || (/^https?:/i.test(d.url || "") ? d.url : "");
-    if (isAndroid() && d.android) { openAndroidIntent(d); return; }   // la APP directa
-    if (d.scheme) { open(d.scheme, d.appOnly ? null : fb); return; }
-    open((/^https?:/i.test(d.url || "") ? d.url : "") || fb, fb);
+    var web = d.web || d.https || (/^https?:/i.test(d.url || "") ? d.url : "");
+    var fb = d.appOnly ? null : web;
+    // 1) Esquema nativo (whatsapp://, tg://, spotify:…): abre la APP directa. NUNCA pasa por Play Store
+    //    (la Play Store solo aparece con los intent: de paquete). Si la app no está y NO es appOnly,
+    //    open() detecta que no se abrió y cae a la web.
+    if (d.scheme) { open(d.scheme, fb); return; }
+    // 2) Sin esquema pero con package en Android: intent de lanzador con respaldo a WEB (no Play Store).
+    if (isAndroid() && d.android) { openAndroidIntent(d); return; }
+    // 3) Web normal.
+    open((/^https?:/i.test(d.url || "") ? d.url : "") || web, web);
   }
   function openApp(key) {
     var a = APPS[key];

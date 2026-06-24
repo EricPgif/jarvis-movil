@@ -9,6 +9,11 @@
     get model() { return localStorage.getItem("mm_model") || "MiniMax-M2"; },
     get clap()  { return localStorage.getItem("mm_clap") === "1"; },
     set clap(v) { localStorage.setItem("mm_clap", v ? "1" : "0"); },
+    // Escucha continua «Jarvis» en Modo Super. APAGADA por defecto: en la PWA instalada de Android
+    // el reconocimiento continuo hace un "tic" del micro en bucle y se interrumpe. Lo normal es
+    // TOCAR la esfera. Quien quiera manos-libres la activa aquí.
+    get wake()  { return localStorage.getItem("mm_wake") === "1"; },
+    set wake(v) { localStorage.setItem("mm_wake", v ? "1" : "0"); },
   };
 
   var SYSTEM =
@@ -64,6 +69,9 @@
     "QUE PUEDES HACER EN ESTE MOVIL (dilo con naturalidad si viene a cuento):",
     "- Abrir apps del telefono: Spotify (musica), YouTube, WhatsApp, Telegram, correo, calendario,",
     "  navegador, camara. Si te piden 'pon musica' o 'abre X', se abre solo.",
+    "- GENERAR IMAGENES: SI PUEDES crear imagenes (con MiniMax image-01). Cuando Eric te pida 'hazme",
+    "  una imagen de…', 'crea/dibuja…', se genera y se muestra sola. NUNCA digas que solo eres texto",
+    "  ni que no puedes crear imagenes: SI puedes. Si te preguntan, di que pidan 'hazme una imagen de X'.",
     "- El control del PC (archivos, programas) necesita el JARVIS de escritorio; dilo sin drama.",
     "",
     "BUSQUEDA WEB: TIENES una herramienta de busqueda (web_search). Cuando te pregunten por algo",
@@ -310,31 +318,62 @@
     if (/\b(cuadrad|1:1|perfil|avatar)\b/.test(n)) return "1:1";
     return "1:1";
   }
-  // Genera la imagen llamando al Worker (/image), que añade la key y llama a MiniMax server-side.
+  // Host raíz de MiniMax (sin el sufijo /anthropic) para los endpoints nativos (image_generation).
+  function mmHost() { return CFG.base.replace(/\/anthropic\/?$/i, "").replace(/\/+$/, ""); }
+  function imgBody(prompt, aspect) {
+    return JSON.stringify({ model: "image-01", prompt: prompt, aspect_ratio: aspect || "1:1", response_format: "url", n: 1, prompt_optimizer: true });
+  }
+  // 1) Intento DIRECTO navegador→MiniMax. El host es el mismo que /v1/messages (que SÍ va por CORS),
+  //    así que puede funcionar sin Worker. Si CORS lo bloquea → fetch lanza → caemos al Worker.
+  function directImage(prompt, aspect, signal) {
+    return fetch(mmHost() + "/v1/image_generation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CFG.key },
+      body: imgBody(prompt, aspect), signal: signal,
+    }).then(function (r) { return r.json().catch(function () { return {}; }); }).then(function (d) {
+      var sc = d && d.base_resp && d.base_resp.status_code;
+      if (sc && sc !== 0) throw new Error("mm:" + (d.base_resp.status_msg || sc));   // error real de MiniMax (key/saldo)
+      var urls = (d && d.data && (d.data.image_urls || d.data.image_base64)) || [];
+      if (!urls.length) throw new Error("sin-imagen-directa");
+      return urls;
+    });
+  }
+  // 2) Vía Worker (necesita la ruta /image desplegada).
+  function workerImage(prompt, aspect, signal) {
+    return fetch(workerBase() + "/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: prompt, aspect_ratio: aspect || "1:1", n: 1, key: CFG.key }), signal: signal,
+    }).then(function (r) {
+      return r.text().then(function (txt) {
+        var d = null; try { d = JSON.parse(txt); } catch (e) {}
+        if (!d) throw new Error("worker-no-image");
+        if (d.error) throw new Error("mm:" + d.error);
+        return d.images || [];
+      });
+    });
+  }
   function generateImage(prompt, aspect) {
     if (!CFG.key) return Promise.reject(new Error("Falta la API key, señor."));
     if (!prompt) return Promise.reject(new Error("Sin descripción para la imagen."));
-    var url = workerBase() + "/image";
-    var ctrl, to;
-    try { ctrl = new AbortController(); to = setTimeout(function () { ctrl.abort(); }, 90000); } catch (e) {}
-    return fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: prompt, aspect_ratio: aspect || "1:1", n: 1, key: CFG.key }),
-      signal: ctrl && ctrl.signal,
-    }).then(function (r) {
-      if (to) clearTimeout(to);
-      return r.text().then(function (txt) {
-        var d = null; try { d = JSON.parse(txt); } catch (e) {}
-        if (!d) throw new Error("El Worker aún no tiene la función de imágenes. Vuelve a desplegar worker.js en Cloudflare, señor.");
-        if (d.error) throw new Error(d.error);
-        return d.images || [];
+    var ctrl, to, timedOut = false, sig;
+    try { ctrl = new AbortController(); sig = ctrl.signal; to = setTimeout(function () { timedOut = true; ctrl.abort(); }, 90000); } catch (e) {}
+    return directImage(prompt, aspect, sig)
+      .catch(function (e) {
+        if (timedOut) throw e;
+        var m = (e && e.message) || "";
+        if (m.indexOf("mm:") === 0) throw e;          // error real de MiniMax → el Worker daría lo mismo
+        return workerImage(prompt, aspect, sig);      // CORS u otro → probamos por el Worker
+      })
+      .then(function (urls) { if (to) clearTimeout(to); if (!urls || !urls.length) throw new Error("No he podido generar la imagen, señor."); return urls; })
+      .catch(function (err) {
+        if (to) clearTimeout(to);
+        if (timedOut || (err && err.name === "AbortError")) throw new Error("La imagen tardó demasiado, señor. Inténtelo otra vez.");
+        var m = (err && err.message) || String(err);
+        if (m === "worker-no-image") m = "Las imágenes necesitan que despliegues el Worker una vez (worker.js en Cloudflare), señor.";
+        else if (m.indexOf("mm:") === 0) m = m.slice(3);   // muestra el error real de MiniMax
+        throw new Error(m);
       });
-    }).catch(function (err) {
-      if (to) clearTimeout(to);
-      if (err && err.name === "AbortError") throw new Error("La imagen tardó demasiado, señor. Inténtelo otra vez.");
-      throw err;
-    });
   }
 
   // ── API de conversaciones ──

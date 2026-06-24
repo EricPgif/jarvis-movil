@@ -324,7 +324,11 @@
     if (!sphereMade) { window.Sphere.make($("sup-sphere"), { state: true, isSuper: true, N: 96, R: 84 }); sphereMade = true; }
     renderTiles();
     tick(); if (!clockTimer) clockTimer = setInterval(tick, 1000);
-    try { if (window.Voice && window.Voice.startWake) window.Voice.startWake(function (cmd) { if (window.APP) window.APP.handle(cmd); }, onWakeState); } catch (e) {}
+    // Wake «Jarvis» continuo SOLO si Eric lo activó (por defecto OFF → sin el "tic" del micro en bucle).
+    var wakeOn = window.CFG && window.CFG.wake;
+    var hint = $("sup-hint");
+    if (hint) hint.textContent = wakeOn ? "Toca la esfera o di «Jarvis» para hablar" : "Toca la esfera para hablar";
+    if (wakeOn) { try { if (window.Voice && window.Voice.startWake) window.Voice.startWake(function (cmd) { if (window.APP) window.APP.handle(cmd); }, onWakeState); } catch (e) {} }
   }
   function hide() {
     $("view-super").classList.remove("show");
