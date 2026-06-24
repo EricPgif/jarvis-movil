@@ -23,7 +23,7 @@
     correo:     { frase: "Abriendo Gmail, señor.", scheme: "googlegmail://", https: "https://mail.google.com" },
     calendario: { frase: "Abriendo tu calendario, señor.", https: "https://calendar.google.com" },
     navegador:  { frase: "Abriendo el navegador, señor.",  https: "https://www.google.com" },
-    chrome:     { frase: "Abriendo el navegador, señor.",  https: "https://www.google.com" },
+    chrome:     { frase: "Abriendo Chrome, señor.",  scheme: "googlechrome://", https: "https://www.google.com" },
     clima:      { frase: "Aquí tiene el tiempo, señor.",   https: "https://www.google.com/search?q=el+tiempo+hoy" },
     netflix:    { frase: "Abriendo Netflix, señor.",   https: "https://www.netflix.com" },
     // Apps comunes (intenta la app y, si no está, cae a la web).

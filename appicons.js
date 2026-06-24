@@ -20,11 +20,16 @@
     twitch:   '<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#9146FF"/><path fill="#fff" d="M8 6h9v6.2L14.2 15H12l-2 2v-2H8z"/><rect x="11" y="8.6" width="1.3" height="3" fill="#9146FF"/><rect x="14" y="8.6" width="1.3" height="3" fill="#9146FF"/></svg>',
     netflix:  '<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#000"/><path fill="#E50914" d="M9 5h2.3l3.7 9.4V5H17v14h-2.3L11 9.6V19H9z"/></svg>',
     maps:     '<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#fff"/><path fill="#EA4335" d="M12 5a4.2 4.2 0 0 0-4.2 4.2c0 3 4.2 7.3 4.2 7.3s4.2-4.3 4.2-7.3A4.2 4.2 0 0 0 12 5z"/><circle cx="12" cy="9.2" r="1.6" fill="#fff"/></svg>',
+    chatgpt:  '<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#fff"/><path fill="none" stroke="#0d0d0d" stroke-width="1.15" stroke-linejoin="round" d="M12 6.2c-1.15 0-2.12.66-2.6 1.62-1.06.06-1.97.72-2.37 1.7-.46 1-.32 2.13.3 3-.3.92-.18 1.95.34 2.78.48.96 1.45 1.55 2.5 1.55h.03c.49.95 1.46 1.58 2.6 1.58 1.15 0 2.12-.66 2.6-1.62 1.06-.06 1.97-.72 2.37-1.7.46-1 .32-2.13-.3-3 .3-.92.18-1.95-.34-2.78-.48-.96-1.45-1.55-2.5-1.55h-.03C14.11 6.83 13.14 6.2 12 6.2z"/><path fill="none" stroke="#0d0d0d" stroke-width=".95" stroke-linecap="round" stroke-linejoin="round" d="M12 9.1l2.55 1.47v2.95L12 15 9.45 13.5v-2.95z"/></svg>',
+    pinterest:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#E60023"/><path fill="#fff" d="M12.4 6.4c-3 0-4.7 1.9-4.7 4 0 .98.52 2.2 1.36 2.59.18.08.27.05.31-.14.03-.13.18-.74.25-1.03.02-.09.01-.17-.06-.26-.36-.43-.64-1.22-.64-1.96 0-1.9 1.43-3.74 3.87-3.74 2.11 0 3.58 1.44 3.58 3.5 0 2.32-1.17 3.93-2.7 3.93-.84 0-1.47-.7-1.27-1.55.24-1.02.71-2.12.71-2.86 0-.66-.35-1.21-1.08-1.21-.86 0-1.55.89-1.55 2.08 0 .76.26 1.27.26 1.27l-1.03 4.36c-.3 1.3-.04 2.88-.02 3.04.01.09.13.12.18.05.08-.1 1.07-1.33 1.41-2.55.1-.35.55-2.16.55-2.16.27.52 1.07.98 1.92.98 2.53 0 4.25-2.31 4.25-5.4 0-2.34-1.98-4.52-4.99-4.52z"/></svg>',
+    alexa:    '<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#0b1d2a"/><circle cx="12" cy="12" r="7.6" fill="none" stroke="#00CAFF" stroke-width="1.7"/><path d="M12 4.4a7.6 7.6 0 0 1 6 12.2" fill="none" stroke="#1ce5ff" stroke-width="1.7" stroke-linecap="round"/></svg>',
+    chrome:   '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#fff"/><path fill="#EA3939" d="M12 3a9 9 0 0 1 7.8 4.5H12a4.5 4.5 0 0 0-3.9 2.25L4.6 5.65A9 9 0 0 1 12 3z"/><path fill="#3ECF4C" d="M4.6 5.65 8.1 9.75A4.5 4.5 0 0 0 9.9 15.6L6.3 21A9 9 0 0 1 4.6 5.65z"/><path fill="#FFCD41" d="M19.8 7.5A9 9 0 0 1 12 21l3.9-6.75A4.5 4.5 0 0 0 15.6 8.7z"/><circle cx="12" cy="12" r="3.4" fill="#fff"/><circle cx="12" cy="12" r="2.7" fill="#4a90e2"/></svg>',
   };
   // Alias de nombres equivalentes.
   I.twitter = I.x; I.equis = I.x;
   I.mapas = I.maps; I.googlemaps = I.maps; I.mapa = I.maps;
   I.correo = I.gmail; I.musica = I.spotify;
+  I.openai = I.chatgpt; I.gpt = I.chatgpt;
 
   // Pastilla con la inicial (respaldo si no hay logo). Color estable según el nombre.
   var PALETTE = ["#5865F2", "#1DB954", "#FF4500", "#E50914", "#0088cc", "#FF6D00", "#9146FF", "#E1306C", "#00A8E8", "#7C4DFF", "#FF3D71", "#00C2A8"];

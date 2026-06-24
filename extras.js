@@ -41,6 +41,9 @@
   function addApp() {
     var n = ($("app-name").value || "").trim(), u = ($("app-url").value || "").trim();
     if (!n || !u) return;
+    var key = n.toLowerCase();
+    if (DEFAULT_APPS.indexOf(key) !== -1) { alert("«" + n + "» ya está fija en el dock, señor."); return; }
+    if (getApps().some(function (a) { return a.name.toLowerCase() === key; })) { alert("«" + n + "» ya la tienes añadida, señor."); return; }
     var domain = ""; try { if (/^https?:/.test(u)) domain = new URL(u).hostname.replace(/^www\./, ""); } catch (e) {}
     var a = getApps(); a.push({ name: n, url: u, web: /^https?:/.test(u) ? u : "", domain: domain }); setApps(a);
     $("app-name").value = ""; $("app-url").value = "";
@@ -100,6 +103,7 @@
     { name: "Pinterest",   url: "pinterest://",    web: "https://pinterest.com",    domain: "pinterest.com" },
     { name: "Snapchat",    url: "snapchat://",     web: "https://snapchat.com",     domain: "snapchat.com" },
     { name: "Netflix",     url: "nflx://",         web: "https://www.netflix.com",  domain: "netflix.com" },
+    { name: "Alexa",       url: "https://alexa.amazon.com", web: "https://alexa.amazon.com", domain: "" },
     { name: "Amazon",      url: "https://www.amazon.es",  web: "https://www.amazon.es",   domain: "amazon.com" },
     { name: "Steam",       url: "steam://open/main", web: "https://store.steampowered.com", domain: "steampowered.com" },
     { name: "Epic Games",  url: "https://store.epicgames.com", web: "https://store.epicgames.com", domain: "epicgames.com" },
@@ -120,11 +124,24 @@
     { name: "Yuka",        url: "https://yuka.io", web: "https://yuka.io",          domain: "yuka.io" },
     { name: "Meta Horizon",url: "https://www.meta.com", web: "https://www.meta.com", domain: "meta.com" },
     { name: "Play Store",  url: "market://",       web: "https://play.google.com",  domain: "" },
+    { name: "Google One",  url: "https://one.google.com", web: "https://one.google.com", domain: "" },
+    { name: "Lens",        url: "https://lens.google.com", web: "https://lens.google.com", domain: "" },
+    { name: "Meet",        url: "https://meet.google.com", web: "https://meet.google.com", domain: "" },
+    { name: "Keep",        url: "https://keep.google.com", web: "https://keep.google.com", domain: "" },
+    { name: "Google TV",   url: "https://tv.google.com", web: "https://tv.google.com", domain: "" },
+    { name: "Wallet",      url: "https://wallet.google.com", web: "https://wallet.google.com", domain: "" },
+    { name: "JBL",         url: "https://www.jbl.com", web: "https://www.jbl.com", domain: "jbl.com" },
+    { name: "Mi Fitness",  url: "https://www.mi.com", web: "https://www.mi.com", domain: "mi.com" },
+    { name: "MixerBox",    url: "https://www.mixerbox.com", web: "https://www.mixerbox.com", domain: "mixerbox.com" },
+    { name: "Booking",     url: "https://www.booking.com", web: "https://www.booking.com", domain: "booking.com" },
+    { name: "PayPal",      url: "https://www.paypal.com", web: "https://www.paypal.com", domain: "paypal.com" },
   ];
+  // Apps FIJAS del dock (predeterminadas): no se pueden añadir de nuevo (evita un 2º Gmail, etc.).
+  var DEFAULT_APPS = ["spotify", "youtube", "whatsapp", "telegram", "chrome", "gmail", "navegador", "calendario", "agenda"];
   function renderSuggest() {
     var box = $("app-suggest"); if (!box) return;
     var have = {}; getApps().forEach(function (a) { have[a.name.toLowerCase()] = 1; });
-    box.innerHTML = COMMON.filter(function (c) { return c.url && !have[c.name.toLowerCase()]; })
+    box.innerHTML = COMMON.filter(function (c) { return c.url && !have[c.name.toLowerCase()] && DEFAULT_APPS.indexOf(c.name.toLowerCase()) === -1; })
       .map(function (c) { var ic = window.AppIcons ? window.AppIcons.html(c.name, c.domain) : ""; return '<button class="app-chip" data-app="' + esc(c.name) + '">' + ic + esc(c.name) + '</button>'; }).join("");
     Array.prototype.forEach.call(box.querySelectorAll(".app-chip"), function (b) {
       b.addEventListener("click", function () {
@@ -139,5 +156,9 @@
     renderCommands(); renderApps(); renderSuggest(); renderDiag(); renderDock();
     var add = $("app-add"); if (add && !add._wired) { add._wired = true; add.addEventListener("click", addApp); }
   }
-  window.Extras = { init: init, renderDock: renderDock };
+  window.Extras = {
+    init: init, renderDock: renderDock,
+    getApps: getApps, setApps: setApps, catalog: COMMON, defaults: DEFAULT_APPS,
+    refresh: function () { renderApps(); renderSuggest(); renderDock(); },
+  };
 })();

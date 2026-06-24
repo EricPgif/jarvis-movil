@@ -126,9 +126,46 @@
   function stopListen() { if (rec && listening) { try { rec.stop(); } catch (e) {} } }
   function isListening() { return listening; }
 
+  // ── Wake word "Jarvis" (escucha CONTINUA; solo se usa en Modo Super) ──
+  var WSR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var wrec = null;
+  if (WSR) { try { wrec = new WSR(); wrec.lang = "es-ES"; wrec.continuous = true; wrec.interimResults = true; wrec.maxAlternatives = 1; } catch (e) { wrec = null; } }
+  var wakeOn = false, capturing = false, lastCmd = 0, _onCmd = null, _onWS = null;
+  function wnorm(s) { return (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+  function wstart() { if (wakeOn && wrec) { try { wrec.start(); } catch (e) {} } }
+  function fire(cmd) {
+    cmd = (cmd || "").replace(/\bjarvis\b/gi, "").trim();
+    var now = +new Date();
+    if (!cmd || now - lastCmd < 1500) { capturing = false; if (_onWS) _onWS("idle"); return; }
+    lastCmd = now; capturing = false;
+    if (_onWS) _onWS("idle");
+    if (_onCmd) _onCmd(cmd);
+  }
+  function startWake(onCommand, onState) {
+    if (!wrec) { if (onState) onState("unsupported"); return false; }
+    _onCmd = onCommand; _onWS = onState; wakeOn = true; capturing = false;
+    wrec.onresult = function (e) {
+      var r = e.results[e.results.length - 1];
+      var t = wnorm(r[0].transcript);
+      if (capturing) { if (r.isFinal) fire(t); return; }       // ya en captura → la orden es esto
+      var i = t.lastIndexOf("jarvis");
+      if (i === -1) return;
+      var after = t.slice(i + 6).trim();
+      if (after.length >= 2) { if (r.isFinal) fire(after); }    // "jarvis abre spotify"
+      else { capturing = true; if (_onWS) _onWS("listening"); } // solo "jarvis" → capturar la orden
+    };
+    wrec.onend = function () { if (wakeOn) setTimeout(wstart, 250); };   // Android corta solo → reiniciar
+    wrec.onerror = function () { /* el onend reinicia */ };
+    wstart();
+    return true;
+  }
+  function stopWake() { wakeOn = false; capturing = false; if (wrec) { try { wrec.onend = null; wrec.onresult = null; wrec.abort(); } catch (e) {} } }
+  function wakeCapture() { if (!wrec) return false; capturing = true; if (_onWS) _onWS("listening"); wstart(); return true; }  // clic esfera
+
   window.Voice = {
     speak: speak, cancel: cancel, unlock: unlock,
     toggleListen: toggleListen, stopListen: stopListen, isListening: isListening,
     sttSupported: sttSupported,
+    startWake: startWake, stopWake: stopWake, wakeCapture: wakeCapture, wakeSupported: function () { return !!wrec; },
   };
 })();

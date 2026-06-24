@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "3.6";
-  var WHATS_NEW = "Catálogo grande de apps en «Mis Apps» (Spotify, Steam, Canva, ChatGPT, Proton, Amazon…) y cada una con su LOGO real. Añade las tuyas con un toque y salen en el dock.";
+  var APP_VERSION = "3.7";
+  var WHATS_NEW = "MODO SUPER nuevo: solo voz — toca la esfera (o di «Jarvis») para hablar. Coloca tus apps alrededor de la esfera arrastrándolas (mantén pulsada y mueve), ＋ para añadir, suelta en «Quitar» para sacarlas. Logos corregidos (ChatGPT, Pinterest, Alexa, Chrome).";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
