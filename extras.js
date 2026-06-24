@@ -41,7 +41,8 @@
   function addApp() {
     var n = ($("app-name").value || "").trim(), u = ($("app-url").value || "").trim();
     if (!n || !u) return;
-    var a = getApps(); a.push({ name: n, url: u, web: /^https?:/.test(u) ? u : "" }); setApps(a);
+    var domain = ""; try { if (/^https?:/.test(u)) domain = new URL(u).hostname.replace(/^www\./, ""); } catch (e) {}
+    var a = getApps(); a.push({ name: n, url: u, web: /^https?:/.test(u) ? u : "", domain: domain }); setApps(a);
     $("app-name").value = ""; $("app-url").value = "";
     renderApps(); renderSuggest(); renderDock();
   }
@@ -51,11 +52,12 @@
     getApps().forEach(function (a, i) {
       var b = document.createElement("button");
       b.className = "qbtn"; b.setAttribute("data-myapp", i);
-      var ic = (window.AppIcons && window.AppIcons.get(a.name)) || "▣";   // logo del catálogo si existe
+      var ic = window.AppIcons ? window.AppIcons.html(a.name, a.domain) : "▣";   // logo real o pastilla
       b.innerHTML = '<span class="qi">' + ic + '</span><span class="ql">' + esc(a.name.slice(0, 9)) + '</span>';
       b.addEventListener("click", function () {
-        if (window.Links) window.Links.open(a.url, a.web || (/^https?:/.test(a.url) ? a.url : null));
-        else window.location.href = a.url;
+        var t = a.url || a.web;
+        if (window.Links) window.Links.open(t, a.web || (/^https?:/.test(t) ? t : null));
+        else window.location.href = t;
       });
       dock.appendChild(b);
     });
@@ -81,28 +83,54 @@
 
   // Apps populares para AÑADIR con un toque (no se pueden escanear las del móvil → sandbox
   // del navegador; el usuario elige de esta lista o añade una a mano). url=scheme, web=respaldo.
+  // Catálogo de apps para AÑADIR con un toque (cada uno pone las SUYAS; no se pueden escanear
+  // las instaladas → sandbox). url=cómo abrir, web=respaldo, domain=para sacar el logo real.
   var COMMON = [
-    { name: "Discord",   url: "discord://",    web: "https://discord.com/app" },
-    { name: "Instagram", url: "instagram://",  web: "https://instagram.com" },
-    { name: "TikTok",    url: "snssdk1233://", web: "https://www.tiktok.com" },
-    { name: "Pinterest", url: "pinterest://",  web: "https://pinterest.com" },
-    { name: "X",         url: "twitter://",    web: "https://x.com" },
-    { name: "Reddit",    url: "reddit://",     web: "https://reddit.com" },
-    { name: "Twitch",    url: "twitch://",     web: "https://twitch.tv" },
-    { name: "Netflix",   url: "nflx://",       web: "https://www.netflix.com" },
-    { name: "Maps",      url: "geo:0,0",       web: "https://maps.google.com" },
-    { name: "Fotos",     url: "",              web: "" },
+    { name: "Spotify",     url: "spotify:",        web: "https://open.spotify.com", domain: "spotify.com" },
+    { name: "YouTube",     url: "https://www.youtube.com", web: "https://www.youtube.com", domain: "youtube.com" },
+    { name: "WhatsApp",    url: "whatsapp://",     web: "https://web.whatsapp.com", domain: "whatsapp.com" },
+    { name: "Telegram",    url: "tg://",           web: "https://web.telegram.org", domain: "telegram.org" },
+    { name: "Instagram",   url: "instagram://",    web: "https://instagram.com",    domain: "instagram.com" },
+    { name: "TikTok",      url: "snssdk1233://",   web: "https://www.tiktok.com",   domain: "tiktok.com" },
+    { name: "X",           url: "twitter://",      web: "https://x.com",            domain: "x.com" },
+    { name: "Facebook",    url: "fb://",           web: "https://facebook.com",     domain: "facebook.com" },
+    { name: "Discord",     url: "discord://",      web: "https://discord.com/app",  domain: "discord.com" },
+    { name: "Reddit",      url: "reddit://",       web: "https://reddit.com",       domain: "reddit.com" },
+    { name: "Twitch",      url: "twitch://",       web: "https://twitch.tv",        domain: "twitch.tv" },
+    { name: "Pinterest",   url: "pinterest://",    web: "https://pinterest.com",    domain: "pinterest.com" },
+    { name: "Snapchat",    url: "snapchat://",     web: "https://snapchat.com",     domain: "snapchat.com" },
+    { name: "Netflix",     url: "nflx://",         web: "https://www.netflix.com",  domain: "netflix.com" },
+    { name: "Amazon",      url: "https://www.amazon.es",  web: "https://www.amazon.es",   domain: "amazon.com" },
+    { name: "Steam",       url: "steam://open/main", web: "https://store.steampowered.com", domain: "steampowered.com" },
+    { name: "Epic Games",  url: "https://store.epicgames.com", web: "https://store.epicgames.com", domain: "epicgames.com" },
+    { name: "ChatGPT",     url: "https://chatgpt.com", web: "https://chatgpt.com",  domain: "openai.com" },
+    { name: "Canva",       url: "https://www.canva.com", web: "https://www.canva.com", domain: "canva.com" },
+    { name: "Gemini",      url: "https://gemini.google.com", web: "https://gemini.google.com", domain: "" },
+    { name: "Gmail",       url: "googlegmail://",  web: "https://mail.google.com",  domain: "" },
+    { name: "Drive",       url: "https://drive.google.com", web: "https://drive.google.com", domain: "" },
+    { name: "Maps",        url: "geo:0,0",         web: "https://maps.google.com",  domain: "" },
+    { name: "Fotos",       url: "https://photos.google.com", web: "https://photos.google.com", domain: "" },
+    { name: "Calendar",    url: "https://calendar.google.com", web: "https://calendar.google.com", domain: "" },
+    { name: "Traductor",   url: "https://translate.google.com", web: "https://translate.google.com", domain: "" },
+    { name: "Google",      url: "https://www.google.com", web: "https://www.google.com", domain: "google.com" },
+    { name: "Chrome",      url: "googlechrome://", web: "https://www.google.com/chrome", domain: "" },
+    { name: "Proton Mail", url: "https://mail.proton.me", web: "https://mail.proton.me", domain: "proton.me" },
+    { name: "Proton VPN",  url: "https://protonvpn.com", web: "https://protonvpn.com", domain: "protonvpn.com" },
+    { name: "Revolut",     url: "https://revolut.com", web: "https://revolut.com", domain: "revolut.com" },
+    { name: "Yuka",        url: "https://yuka.io", web: "https://yuka.io",          domain: "yuka.io" },
+    { name: "Meta Horizon",url: "https://www.meta.com", web: "https://www.meta.com", domain: "meta.com" },
+    { name: "Play Store",  url: "market://",       web: "https://play.google.com",  domain: "" },
   ];
   function renderSuggest() {
     var box = $("app-suggest"); if (!box) return;
     var have = {}; getApps().forEach(function (a) { have[a.name.toLowerCase()] = 1; });
     box.innerHTML = COMMON.filter(function (c) { return c.url && !have[c.name.toLowerCase()]; })
-      .map(function (c) { var ic = (window.AppIcons && window.AppIcons.get(c.name)) || ""; return '<button class="app-chip" data-app="' + esc(c.name) + '">' + ic + esc(c.name) + '</button>'; }).join("");
+      .map(function (c) { var ic = window.AppIcons ? window.AppIcons.html(c.name, c.domain) : ""; return '<button class="app-chip" data-app="' + esc(c.name) + '">' + ic + esc(c.name) + '</button>'; }).join("");
     Array.prototype.forEach.call(box.querySelectorAll(".app-chip"), function (b) {
       b.addEventListener("click", function () {
         var c = COMMON.filter(function (x) { return x.name === b.dataset.app; })[0];
         if (!c) return;
-        var a = getApps(); a.push({ name: c.name, url: c.url, web: c.web }); setApps(a);
+        var a = getApps(); a.push({ name: c.name, url: c.url, web: c.web, domain: c.domain || "" }); setApps(a);
         renderApps(); renderSuggest(); renderDock();
       });
     });

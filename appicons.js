@@ -26,8 +26,26 @@
   I.mapas = I.maps; I.googlemaps = I.maps; I.mapa = I.maps;
   I.correo = I.gmail; I.musica = I.spotify;
 
+  // Pastilla con la inicial (respaldo si no hay logo). Color estable según el nombre.
+  var PALETTE = ["#5865F2", "#1DB954", "#FF4500", "#E50914", "#0088cc", "#FF6D00", "#9146FF", "#E1306C", "#00A8E8", "#7C4DFF", "#FF3D71", "#00C2A8"];
+  function colorFor(s) { s = norm(s) || "x"; var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return PALETTE[h % PALETTE.length]; }
+  function tile(name) {
+    var L = ((norm(name).charAt(0)) || "?").toUpperCase();
+    return '<span class="lt" style="background:' + colorFor(name) + '">' + L + '</span>';
+  }
+
   window.AppIcons = {
-    get: function (name) { return I[norm(name)] || null; },
+    get: function (name) { return I[norm(name)] || null; },   // SVG de marca dibujado a mano (o null)
     has: function (name) { return !!I[norm(name)]; },
+    // Mejor icono posible: SVG de marca > logo real (Clearbit) sobre pastilla > pastilla con inicial.
+    html: function (name, domain) {
+      var svg = I[norm(name)];
+      if (svg) return svg;
+      if (domain) {
+        return '<span class="qi-wrap">' + tile(name) +
+          '<img class="lt-img" loading="lazy" src="https://logo.clearbit.com/' + domain + '" alt="" onerror="this.remove()"></span>';
+      }
+      return '<span class="qi-wrap">' + tile(name) + '</span>';
+    },
   };
 })();

@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "3.5";
-  var WHATS_NEW = "WhatsApp ya abre la APP (no la Play Store). El agente busca solo lo reciente (noticias, «qué le pasó a…»). Y voz: ignoro URLs viejas que rompían a Álvaro + botón «Probar voz» en Ajustes.";
+  var APP_VERSION = "3.6";
+  var WHATS_NEW = "Catálogo grande de apps en «Mis Apps» (Spotify, Steam, Canva, ChatGPT, Proton, Amazon…) y cada una con su LOGO real. Añade las tuyas con un toque y salen en el dock.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──

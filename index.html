@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="manifest" href="manifest.json?v=25" />
+<link rel="manifest" href="manifest.json?v=26" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 <style>
   :root{
@@ -151,6 +151,13 @@
   .app-chip{padding:7px 12px; border-radius:20px; border:1px solid var(--border-hi); background:var(--cyan-soft); color:var(--cyan); font-size:13px; font-weight:600;}
   .app-chip:active{background:var(--cyan-glow);}
   .app-chip svg{width:15px; height:15px; vertical-align:-3px; margin-right:5px;}
+  /* Logos del catálogo: logo real (Clearbit) sobre pastilla con inicial (respaldo). */
+  .qi-wrap{position:relative; width:27px; height:27px; display:inline-block; vertical-align:middle;}
+  .qi-wrap .lt{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; border-radius:7px; color:#fff; font-weight:700; font-size:14px;}
+  .qi-wrap .lt-img{position:absolute; inset:0; width:100%; height:100%; border-radius:7px; object-fit:contain; background:#fff;}
+  .app-chip .qi-wrap{width:16px; height:16px; vertical-align:-3px; margin-right:5px;}
+  .app-chip .qi-wrap .lt{font-size:9px; border-radius:4px;}
+  .app-chip .qi-wrap .lt-img{border-radius:4px;}
 
   /* ── Overlays (intro y super se rellenan por JS) ── */
   #view-intro, #view-super{position:fixed; inset:0; z-index:50;}
@@ -288,22 +295,22 @@
     </div>
   </div>
 
-  <script src="sfx.js?v=25"></script>
-  <script src="sphere.js?v=25"></script>
-  <script src="appicons.js?v=25"></script>
-  <script src="memory.js?v=25"></script>
-  <script src="api.js?v=25"></script>
-  <script src="edgetts.js?v=25"></script>
-  <script src="pcvoice.js?v=25"></script>
-  <script src="voice.js?v=25"></script>
-  <script src="deeplinks.js?v=25"></script>
-  <script src="weather.js?v=25"></script>
-  <script src="router.js?v=25"></script>
-  <script src="super.js?v=25"></script>
-  <script src="intro.js?v=25"></script>
-  <script src="clap.js?v=25"></script>
-  <script src="standby.js?v=25"></script>
-  <script src="extras.js?v=25"></script>
-  <script src="movil.js?v=25"></script>
+  <script src="sfx.js?v=26"></script>
+  <script src="sphere.js?v=26"></script>
+  <script src="appicons.js?v=26"></script>
+  <script src="memory.js?v=26"></script>
+  <script src="api.js?v=26"></script>
+  <script src="edgetts.js?v=26"></script>
+  <script src="pcvoice.js?v=26"></script>
+  <script src="voice.js?v=26"></script>
+  <script src="deeplinks.js?v=26"></script>
+  <script src="weather.js?v=26"></script>
+  <script src="router.js?v=26"></script>
+  <script src="super.js?v=26"></script>
+  <script src="intro.js?v=26"></script>
+  <script src="clap.js?v=26"></script>
+  <script src="standby.js?v=26"></script>
+  <script src="extras.js?v=26"></script>
+  <script src="movil.js?v=26"></script>
 </body>
 </html>
