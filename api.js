@@ -18,7 +18,16 @@
     "tú mismo (tu conocimiento llega hasta 2026). Estás en su móvil: puedes conversar, abrir " +
     "apps del teléfono y ayudar, pero no controlas su PC desde aquí.";
 
-  var history = [];   // [{role, content}]
+  // MEMORIA: el historial se GUARDA en el móvil (localStorage) y se restaura al abrir,
+  // así JARVIS recuerda la conversación (tu nombre, tu color favorito…) como en el PC.
+  function loadHist() {
+    try { var h = JSON.parse(localStorage.getItem("mm_history") || "[]"); return Array.isArray(h) ? h : []; }
+    catch (e) { return []; }
+  }
+  function saveHist() {
+    try { localStorage.setItem("mm_history", JSON.stringify(history.slice(-40))); } catch (e) {}
+  }
+  var history = loadHist();   // [{role, content}]
 
   // ── Cerebro: personalidad brillante + natural, y CONTEXTO real de ahora ──
   var BASE_PROMPT = [
@@ -62,7 +71,7 @@
     var key = CFG.key;
     if (!key) return Promise.reject(new Error("sin key"));
     history.push({ role: "user", content: userText });
-    if (history.length > 16) history = history.slice(-16);
+    if (history.length > 20) history = history.slice(-20);
     var payload = {
       model: CFG.model, max_tokens: 1536, temperature: 0.55,
       system: buildSystem(), thinking: { type: "disabled" }, messages: history,
@@ -89,6 +98,7 @@
         txt = txt.replace(/[　-〿぀-ヿ㐀-䶿一-鿿가-힯豈-﫿＀-￯]/g, "");
         txt = txt.replace(/[ \t]{2,}/g, " ").trim();
         history.push({ role: "assistant", content: txt });
+        saveHist();   // recordar la conversación (memoria)
         return txt;
       });
     }).catch(function (err) {
@@ -99,5 +109,9 @@
   }
 
   window.CFG = CFG;
-  window.API = { askMiniMax: askMiniMax, SYSTEM: SYSTEM, history: history };
+  window.API = {
+    askMiniMax: askMiniMax, SYSTEM: SYSTEM,
+    getHistory: function () { return history.slice(); },     // para mostrar el chat pasado
+    clearHistory: function () { history = []; try { localStorage.removeItem("mm_history"); } catch (e) {} },
+  };
 })();

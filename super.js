@@ -66,7 +66,7 @@
     to{transform:translate(-50%,-50%) rotate(360deg) translate(var(--orbit-r)) rotate(-360deg);}}
   @keyframes supSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   #view-super.paused .sup-app{animation-play-state:paused;}
-  #super-log{position:absolute;left:10px;right:10px;bottom:calc(74px + env(safe-area-inset-bottom));max-height:17vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;-webkit-mask-image:linear-gradient(transparent,#000 30%);mask-image:linear-gradient(transparent,#000 30%);}
+  #super-log{position:absolute;left:10px;right:10px;bottom:calc(74px + env(safe-area-inset-bottom));max-height:14vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;z-index:2;pointer-events:none;-webkit-mask-image:linear-gradient(transparent,#000 38%);mask-image:linear-gradient(transparent,#000 38%);}
   #super-log .msg{pointer-events:auto;}
   #super-log .msg{max-width:86%;padding:8px 12px;border-radius:13px;font-size:14px;line-height:1.4;white-space:pre-wrap;word-break:break-word;}
   #super-log .me{align-self:flex-end;background:var(--cyan-soft);border:1px solid var(--border-hi);color:var(--text);}
@@ -97,7 +97,7 @@
       '<div class="sup-hud sup-tl"><div class="t" id="sup-clock">--:--</div><div id="sup-date">—</div></div>' +
       '<div class="sup-hud sup-tr"><div class="wx"><span id="sup-wx-ico">🌡️</span> <span id="sup-wx-temp">--</span>°</div><div id="sup-wx-desc">CLIMA</div></div>' +
       '<div class="sup-hud sup-bl" id="sup-status">EN LÍNEA</div>' +
-      '<div class="sup-hud sup-br">J.A.R.V.I.S<br>MODO SUPER · v8.0</div>' +
+      '<div class="sup-hud sup-br">J.A.R.V.I.S<br>MODO SUPER · v' + (window.JV_VERSION || "?") + '</div>' +
       '<button class="sup-close" id="sup-close" aria-label="Salir">✕</button>' +
       '<div class="sup-core">' +
         '<svg class="sup-rings" viewBox="0 0 300 300"><circle class="rr r1" cx="150" cy="150" r="146"/><circle class="rr r2" cx="150" cy="150" r="126"/><circle class="rr r3" cx="150" cy="150" r="108"/></svg>' +

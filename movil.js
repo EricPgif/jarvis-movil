@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "2.3";
-  var WHATS_NEW = "Voz de JARVIS de las pelis (AlvaroNeural) vía Worker. Pega la URL del Worker en Ajustes → Voz del PC.";
+  var APP_VERSION = "2.4";
+  var WHATS_NEW = "Memoria: ahora recuerdo la conversación al reabrir. Modo Super con la versión correcta y chat más pequeño.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -209,6 +209,12 @@
     $("cfg-save").addEventListener("click", saveSettings);
     $("cfg-install").addEventListener("click", doInstall);
     $("cfg-update").addEventListener("click", forceUpdate);
+    $("cfg-clear").addEventListener("click", function () {
+      if (window.API && window.API.clearHistory) window.API.clearHistory();
+      $("log").innerHTML = ""; var sl = $("super-log"); if (sl) sl.innerHTML = "";
+      closeSettings();
+      addMsg("Memoria borrada, señor. Empezamos de cero.", "sys");
+    });
     $("cfg-sfx").addEventListener("click", function () {
       if (!window.sfx) return;
       var on = !window.sfx.enabled; window.sfx.setEnabled(on);
@@ -282,6 +288,13 @@
       if (!CFG.key) {
         addMsg("Bienvenido, señor. Pulse el engranaje ⚙ e introduzca su API key de MiniMax para empezar.", "jv");
         openSettings();
+        return;
+      }
+      // MEMORIA: si hay conversación guardada, la mostramos (JARVIS la recuerda).
+      var hist = (window.API && window.API.getHistory) ? window.API.getHistory() : [];
+      if (hist.length) {
+        hist.forEach(function (m) { addMsg(m.content, m.role === "user" ? "me" : "jv"); });
+        addMsg("Aquí seguimos, señor. Lo recuerdo todo.", "sys");
       } else {
         addMsg("J.A.R.V.I.S. a su servicio, señor. Hábleme o escriba.", "jv");
       }
