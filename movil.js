@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "3.8";
-  var WHATS_NEW = "El agente busca mejor (clima, partidos…) y si dice «no tengo acceso» busca y reintenta. Modo Super: apps en azul HUD dando vueltas, arrastre arreglado, «Limpiar todo» para empezar de cero. Logos: Steam, Mi Fitness y casi todos salen de verdad.";
+  var APP_VERSION = "3.9";
+  var WHATS_NEW = "Modo Super arreglado: ahora colocas cada app DONDE QUIERAS (la arrastras libre, sin amontonarse) y se queda; ya no «va raro». Y la DOBLE PALMADA por fin funciona (actívala en Ajustes 👏👏).";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -200,6 +200,7 @@
     $("cfg-tts").value = localStorage.getItem("mm_tts_worker") || "";
     if (window.Extras) window.Extras.init();   // Comandos / Mis Apps / Diagnóstico
     if (window.sfx) $("cfg-sfx").classList.toggle("on", window.sfx.enabled);
+    $("cfg-clap").classList.toggle("on", CFG.clap);
     var vl = $("ver-label"); if (vl) vl.textContent = "JARVIS móvil · v" + APP_VERSION;
     $("modal").classList.add("show");
   }
@@ -250,11 +251,13 @@
   }
 
   // ── Wire general ──
-  var _sfxUnlocked = false;
+  var _sfxUnlocked = false, _clapTried = false;
   function wire() {
     // Sonido al tocar botones (y desbloqueo del audio en el primer gesto).
     document.addEventListener("pointerdown", function (e) {
       try { if (window.Voice && Voice.unlock) Voice.unlock(); } catch (e2) {}   // desbloquea audio (voz) en cualquier toque
+      // Doble palmada: si está activada, arráncala en el primer toque (gesto necesario para el micro).
+      if (!_clapTried && CFG.clap && window.Clap && !window.Clap.isRunning()) { _clapTried = true; try { window.Clap.start(); } catch (e3) {} }
       if (!window.sfx) return;
       if (!_sfxUnlocked) { window.sfx.unlock(); _sfxUnlocked = true; }
       var el = e.target && e.target.closest ? e.target.closest("button, .qbtn, .sup-app, .nav-item") : null;
@@ -290,6 +293,11 @@
       if (!window.sfx) return;
       var on = !window.sfx.enabled; window.sfx.setEnabled(on);
       this.classList.toggle("on", on); if (on) window.sfx.beep();
+    });
+    $("cfg-clap").addEventListener("click", function () {
+      var on = !CFG.clap; CFG.clap = on; this.classList.toggle("on", on);
+      if (on) { if (window.Clap) window.Clap.start(); }              // arranca aquí (gesto → permite el micro)
+      else { if (window.Clap) window.Clap.stop(); }
     });
     $("btn-super").addEventListener("click", function () { Voice.unlock(); if (window.Super) window.Super.show(); });
     $("moon").addEventListener("click", function () { if (window.Standby) window.Standby.show(); });

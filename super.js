@@ -67,11 +67,11 @@
   .sup-title{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);font-weight:700;letter-spacing:clamp(2px,1vmin,6px);font-size:clamp(15px,4.4vmin,30px);color:#eafaff;text-shadow:0 0 18px rgba(0,212,255,.9);pointer-events:none;white-space:nowrap;z-index:3;}
   .sup-hint{position:absolute;left:50%;bottom:calc(64px + env(safe-area-inset-bottom));transform:translateX(-50%);font-size:11px;letter-spacing:1.2px;color:var(--text-dim);text-transform:uppercase;pointer-events:none;z-index:5;text-align:center;width:90%;}
   .sup-ring{position:absolute;left:50%;top:44%;width:10px;height:10px;z-index:4;}
-  .sup-app{position:absolute;left:50%;top:50%;width:60px;margin:0;display:flex;flex-direction:column;align-items:center;gap:4px;
+  .sup-app{position:absolute;left:50%;top:50%;width:58px;margin:0;display:flex;flex-direction:column;align-items:center;gap:4px;
     border:0;background:transparent;padding:0;-webkit-appearance:none;appearance:none;touch-action:none;z-index:4;
-    --orbit-r:min(37vmin,178px);--ang:0deg;
-    transform:translate(-50%,-50%) rotate(var(--ang)) translate(var(--orbit-r)) rotate(calc(-1 * var(--ang)));
-    transition:transform .18s cubic-bezier(.2,.7,.2,1);}
+    --x:0px;--y:0px;
+    transform:translate(calc(-50% + var(--x)), calc(-50% + var(--y)));
+    transition:transform .15s cubic-bezier(.2,.7,.2,1);}
   .sup-app.drag{transition:none;z-index:9;}
   .sup-app .si{width:46px;height:46px;border-radius:14px;border:1px solid var(--border-hi);background:rgba(10,23,38,.85);color:var(--cyan);display:flex;align-items:center;justify-content:center;box-shadow:0 0 14px rgba(0,212,255,.16);transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;overflow:hidden;}
   .sup-app .si svg,.sup-app .si .qi-wrap{width:30px;height:30px;}
@@ -82,12 +82,6 @@
   /* Logos en AZUL HUD (mismo color que JARVIS) dentro del Super */
   .sup-app .si svg,.sup-app .si img{filter:brightness(0) saturate(100%) invert(70%) sepia(60%) saturate(3200%) hue-rotate(155deg) brightness(104%) contrast(101%);}
   .sup-app .si .lt{background:rgba(0,212,255,.16)!important;color:var(--cyan)!important;}
-  /* Las apps DAN VUELTAS (orbitan) lentamente; el icono se mantiene derecho. Se pausa al arrastrar. */
-  #sup-ring{animation:supOrbitAll 95s linear infinite;}
-  @keyframes supOrbitAll{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-  .sup-app .si,.sup-app .sl{animation:supUpright 95s linear infinite;}
-  @keyframes supUpright{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
-  #view-super.sdrag #sup-ring,#view-super.sdrag .sup-app .si,#view-super.sdrag .sup-app .sl{animation-play-state:paused;}
   @keyframes supSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   #super-log{position:absolute;left:10px;right:10px;bottom:calc(96px + env(safe-area-inset-bottom));max-height:12vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;z-index:5;pointer-events:none;-webkit-mask-image:linear-gradient(transparent,#000 38%);mask-image:linear-gradient(transparent,#000 38%);}
   #super-log .msg{pointer-events:auto;max-width:86%;padding:8px 12px;border-radius:13px;font-size:14px;line-height:1.4;white-space:pre-wrap;word-break:break-word;}
@@ -170,14 +164,22 @@
   }
 
   // ── Apps alrededor de la esfera + arrastrar ──
+  // Posición por defecto (repartidas en 2 anillos para que NO se solapen con muchas apps).
+  function defaultXY(i) {
+    var R = Math.min(Math.min(window.innerWidth, window.innerHeight) * 0.37, 180);
+    var ring = i < 8 ? 0 : 1, idx = ring === 0 ? i : i - 8;
+    var r = ring === 0 ? R : R * 0.58;
+    var a = (idx / 8) * Math.PI * 2 - Math.PI / 2;
+    return { x: Math.round(Math.cos(a) * r), y: Math.round(Math.sin(a) * r) };
+  }
   function renderTiles() {
     var ring = $("sup-ring"); if (!ring) return;
     ring.innerHTML = "";
-    var apps = getSet(), pos = getPos(), n = apps.length;
+    var apps = getSet(), pos = getPos();
     apps.forEach(function (a, i) {
-      var ang = (a.name in pos) ? pos[a.name] : Math.round((i / Math.max(n, 1)) * 360 - 90);
+      var p = (pos[a.name] && typeof pos[a.name] === "object") ? pos[a.name] : defaultXY(i);
       var b = document.createElement("button");
-      b.className = "sup-app"; b.style.setProperty("--ang", ang + "deg");
+      b.className = "sup-app"; b.style.setProperty("--x", (p.x || 0) + "px"); b.style.setProperty("--y", (p.y || 0) + "px");
       b.innerHTML = '<span class="si">' + iconFor(a) + '</span><span class="sl">' + esc(a.name) + '</span>';
       attachDrag(b, a);
       ring.appendChild(b);
@@ -194,52 +196,47 @@
     if (on === undefined) { var r = t.getBoundingClientRect(); return x >= r.left - 30 && x <= r.right + 30 && y >= r.top - 30 && y <= r.bottom + 30; }
     t.classList.toggle("show", on);
   }
-  function ringRot() {   // rotación actual del anillo (para que el ángulo del dedo sea correcto)
-    var ring = $("sup-ring"); if (!ring) return 0;
-    var m = getComputedStyle(ring).transform;
-    var v = m && m.match(/matrix\(([^)]+)\)/);
-    if (!v) return 0;
-    var p = v[1].split(",").map(parseFloat);
-    return Math.atan2(p[1], p[0]) * 180 / Math.PI;
-  }
   function attachDrag(el, app) {
-    var hold = null, dragging = false, moved = false, cx = 0, cy = 0, sx = 0, sy = 0, rot0 = 0;
+    var hold = null, dragging = false, moved = false, cx = 0, cy = 0, sx = 0, sy = 0;
     el.addEventListener("pointerdown", function (ev) {
       moved = false; dragging = false; sx = ev.clientX; sy = ev.clientY;
       var r = $("sup-ring").getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2;
-      try { el.setPointerCapture(ev.pointerId); } catch (e) {}   // capturar el dedo YA (clave para que arrastre)
+      try { el.setPointerCapture(ev.pointerId); } catch (e) {}   // capturar el dedo YA (clave para que arrastre de verdad)
       hold = setTimeout(function () {
         dragging = true; el.classList.add("drag");
-        $("view-super").classList.add("sdrag");                  // pausa la rotación mientras arrastras
-        rot0 = ringRot();
         try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
         trashHot(0, 0, true);
-      }, 300);
+      }, 280);
     });
     el.addEventListener("pointermove", function (ev) {
       if (!dragging) {
         if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 12) { moved = true; if (hold) { clearTimeout(hold); hold = null; } }
         return;
       }
-      var a = Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI - rot0;   // ángulo en el marco del anillo
-      el.style.setProperty("--ang", a + "deg");
+      // Colocación LIBRE: el icono sigue al dedo (limitado a un radio razonable).
+      var lim = Math.min(window.innerWidth, window.innerHeight) * 0.46;
+      var dx = Math.max(-lim, Math.min(lim, ev.clientX - cx));
+      var dy = Math.max(-lim, Math.min(lim, ev.clientY - cy));
+      el.style.setProperty("--x", Math.round(dx) + "px");
+      el.style.setProperty("--y", Math.round(dy) + "px");
       var t = $("sup-trash"); if (t) t.classList.toggle("hot", trashHot(ev.clientX, ev.clientY));
     });
     function end(ev) {
       if (hold) { clearTimeout(hold); hold = null; }
       try { el.releasePointerCapture(ev.pointerId); } catch (e) {}
       if (dragging) {
-        dragging = false; el.classList.remove("drag"); $("view-super").classList.remove("sdrag"); trashHot(0, 0, false);
+        dragging = false; el.classList.remove("drag"); trashHot(0, 0, false);
         if (trashHot(ev.clientX, ev.clientY)) { removeApp(app); return; }
-        var ang = parseFloat(el.style.getPropertyValue("--ang")) || 0;
-        var p = getPos(); p[app.name] = Math.round(ang); setPos(p);
+        var p = getPos();
+        p[app.name] = { x: parseFloat(el.style.getPropertyValue("--x")) || 0, y: parseFloat(el.style.getPropertyValue("--y")) || 0 };
+        setPos(p);
       } else if (!moved) {
         var say = openDesc(app);
         if (say && window.APP) APP.addMsg(say, "jv");
       }
     }
     el.addEventListener("pointerup", end);
-    el.addEventListener("pointercancel", function () { if (hold) { clearTimeout(hold); hold = null; } if (dragging) { dragging = false; el.classList.remove("drag"); $("view-super").classList.remove("sdrag"); trashHot(0, 0, false); } });
+    el.addEventListener("pointercancel", function () { if (hold) { clearTimeout(hold); hold = null; } if (dragging) { dragging = false; el.classList.remove("drag"); trashHot(0, 0, false); } });
   }
 
   // ── Drawer: añadir apps ──
