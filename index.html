@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="manifest" href="manifest.json?v=14" />
+<link rel="manifest" href="manifest.json?v=15" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 <style>
   :root{
@@ -118,6 +118,9 @@
   .ex-add input{flex:1; min-width:0; padding:9px 10px; font-size:14px; border-radius:9px; background:var(--bg); border:1px solid var(--border); color:var(--text); outline:none;}
   .ex-add input:focus{border-color:var(--cyan);}
   .ex-add button{flex:0 0 auto; width:44px; border-radius:9px; border:1px solid var(--cyan); background:var(--cyan-soft); color:var(--cyan); font-size:20px;}
+  .app-suggest{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:8px;}
+  .app-chip{padding:7px 12px; border-radius:20px; border:1px solid var(--border-hi); background:var(--cyan-soft); color:var(--cyan); font-size:13px; font-weight:600;}
+  .app-chip:active{background:var(--cyan-glow);}
 
   /* ── Overlays (intro y super se rellenan por JS) ── */
   #view-intro, #view-super{position:fixed; inset:0; z-index:50;}
@@ -215,13 +218,17 @@
 
       <div class="cfg-sep"></div>
       <div class="ex-h">▣ MIS APPS (accesos directos)</div>
+      <div class="hint" style="margin:0 0 8px">El móvil no permite escanear las apps instaladas (seguridad). Toca una para añadirla al dock:</div>
+      <div id="app-suggest" class="app-suggest"></div>
       <div id="myapps-list"></div>
-      <div class="ex-add">
-        <input id="app-name" type="text" placeholder="Nombre (Discord)" />
-        <input id="app-url" type="text" placeholder="discord:// o https://…" />
-        <button id="app-add" aria-label="Añadir">＋</button>
-      </div>
-      <div class="hint">No se pueden escanear tus apps (lo prohíbe el móvil). Añádelas aquí una vez y salen en el dock para siempre.</div>
+      <details style="margin-top:8px">
+        <summary class="hint" style="cursor:pointer">➕ Añadir otra a mano (avanzado)</summary>
+        <div class="ex-add">
+          <input id="app-name" type="text" placeholder="Nombre" />
+          <input id="app-url" type="text" placeholder="discord:// o https://…" />
+          <button id="app-add" aria-label="Añadir">＋</button>
+        </div>
+      </details>
 
       <div class="cfg-sep"></div>
       <div class="ex-h">◎ DIAGNÓSTICO</div>
@@ -231,20 +238,20 @@
     </div>
   </div>
 
-  <script src="sfx.js?v=14"></script>
-  <script src="sphere.js?v=14"></script>
-  <script src="api.js?v=14"></script>
-  <script src="edgetts.js?v=14"></script>
-  <script src="pcvoice.js?v=14"></script>
-  <script src="voice.js?v=14"></script>
-  <script src="deeplinks.js?v=14"></script>
-  <script src="weather.js?v=14"></script>
-  <script src="router.js?v=14"></script>
-  <script src="super.js?v=14"></script>
-  <script src="intro.js?v=14"></script>
-  <script src="clap.js?v=14"></script>
-  <script src="standby.js?v=14"></script>
-  <script src="extras.js?v=14"></script>
-  <script src="movil.js?v=14"></script>
+  <script src="sfx.js?v=15"></script>
+  <script src="sphere.js?v=15"></script>
+  <script src="api.js?v=15"></script>
+  <script src="edgetts.js?v=15"></script>
+  <script src="pcvoice.js?v=15"></script>
+  <script src="voice.js?v=15"></script>
+  <script src="deeplinks.js?v=15"></script>
+  <script src="weather.js?v=15"></script>
+  <script src="router.js?v=15"></script>
+  <script src="super.js?v=15"></script>
+  <script src="intro.js?v=15"></script>
+  <script src="clap.js?v=15"></script>
+  <script src="standby.js?v=15"></script>
+  <script src="extras.js?v=15"></script>
+  <script src="movil.js?v=15"></script>
 </body>
 </html>

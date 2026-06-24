@@ -17,8 +17,8 @@
   var APPS = {
     spotify:    { frase: "Abriendo Spotify, señor.",   scheme: "spotify:",                 https: "https://open.spotify.com" },
     youtube:    { frase: "Abriendo YouTube, señor.",   https: "https://www.youtube.com" },
-    whatsapp:   { frase: "Abriendo WhatsApp, señor.",  scheme: "whatsapp://",              https: "https://web.whatsapp.com" },
-    telegram:   { frase: "Abriendo Telegram, señor.",  scheme: "tg://",                    https: "https://web.telegram.org" },
+    whatsapp:   { frase: "Abriendo WhatsApp, señor.",  scheme: "whatsapp://send",          appOnly: true },
+    telegram:   { frase: "Abriendo Telegram, señor.",  scheme: "tg://",                    appOnly: true },
     gmail:      { frase: "Abriendo el correo, señor.", https: "https://mail.google.com" },
     correo:     { frase: "Abriendo el correo, señor.", https: "https://mail.google.com" },
     calendario: { frase: "Abriendo tu calendario, señor.", https: "https://calendar.google.com" },
@@ -39,17 +39,23 @@
     var isScheme = !/^https?:/i.test(target);
     if (isScheme && httpsFallback) {
       var fell = false;
-      var onVis = function () {
-        if (document.hidden) { fell = true; document.removeEventListener("visibilitychange", onVis); }
-      };
-      document.addEventListener("visibilitychange", onVis);
-      try { window.location.href = target; }
-      catch (e) { fell = true; try { window.location.href = httpsFallback; } catch (e2) {} }
-      // Si la app NO se abrió (seguimos visibles) tras ~1.1s, vamos a la web.
-      setTimeout(function () {
+      function cleanup() {
         document.removeEventListener("visibilitychange", onVis);
-        if (!fell && !document.hidden) { fell = true; try { window.location.href = httpsFallback; } catch (e) {} }
-      }, 1100);
+        window.removeEventListener("blur", mark);
+        window.removeEventListener("pagehide", mark);
+      }
+      function mark() { fell = true; cleanup(); }              // la app se abrió → no caer a web
+      var onVis = function () { if (document.hidden) mark(); };
+      document.addEventListener("visibilitychange", onVis);
+      window.addEventListener("blur", mark);
+      window.addEventListener("pagehide", mark);
+      try { window.location.href = target; }
+      catch (e) { fell = true; cleanup(); try { window.location.href = httpsFallback; } catch (e2) {} }
+      // Si tras 1.5s seguimos visibles (la app no se abrió), vamos a la web.
+      setTimeout(function () {
+        cleanup();
+        if (!fell && !document.hidden) { try { window.location.href = httpsFallback; } catch (e) {} }
+      }, 1500);
     } else {
       try { window.location.href = target; } catch (e) {}
     }
@@ -58,7 +64,8 @@
   function openApp(key) {
     var a = APPS[key];
     if (!a) return null;
-    open(a.scheme || a.https, a.https);
+    if (a.appOnly && a.scheme) open(a.scheme, null);   // SOLO la app (sin abrir el navegador)
+    else open(a.scheme || a.https, a.https);
     return a.frase;
   }
   function openNamed(key) {

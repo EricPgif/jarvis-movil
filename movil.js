@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "2.4";
-  var WHATS_NEW = "Memoria: ahora recuerdo la conversación al reabrir. Modo Super con la versión correcta y chat más pequeño.";
+  var APP_VERSION = "2.5";
+  var WHATS_NEW = "Clima por tu ubicación real (GPS), WhatsApp/Telegram abren solo en su app, y «Mis Apps» con lista para elegir.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
