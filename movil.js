@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "2.9";
-  var WHATS_NEW = "¡Primer agente! Ahora puedo BUSCAR en internet y resumirte (noticias de hoy, datos en tiempo real). Lo uso solo cuando hace falta. (Requiere actualizar el Worker una vez.)";
+  var APP_VERSION = "3.0";
+  var WHATS_NEW = "Cuando lanzo un agente verás una animación tipo reactor («Buscando en la web…»). Arreglado abrir WhatsApp. Chat un poco más compacto. (La búsqueda web necesita actualizar el Worker una vez.)";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -32,8 +32,16 @@
   // Actualiza el texto de un mensaje Y su clon en el chat del Super.
   function setMsg(el, text) {
     if (!el) return;
-    el.textContent = text;
-    if (el._mirror) el._mirror.textContent = text;
+    el.classList.remove("agent"); el.textContent = text;
+    if (el._mirror) { el._mirror.classList.remove("agent"); el._mirror.textContent = text; }
+  }
+  function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  // Convierte un globo en una tarjeta de "agente trabajando" (reactor girando + texto + puntos).
+  function setAgent(el, label) {
+    if (!el) return;
+    var html = '<span class="agent-orb"></span><span class="agent-tx">' + escapeHtml(label) + '<span class="dots"></span></span>';
+    el.classList.add("agent"); el.innerHTML = html;
+    if (el._mirror) { el._mirror.classList.add("agent"); el._mirror.innerHTML = html; }
   }
   function setState(s) {   // '', 'listening', 'speaking', 'thinking'
     Sphere.setMode(s === "thinking" ? "processing" : (s || "idle"));
@@ -72,7 +80,7 @@
     busy = true;
     setState("thinking");
     var thinking = addMsg("…", "jv");
-    API.askMiniMax(text, function (status) { setMsg(thinking, "🔎 " + status); }).then(function (reply) {
+    API.askMiniMax(text, function (status) { setAgent(thinking, status); }).then(function (reply) {
       setMsg(thinking, reply || "(sin respuesta)");
       $("log").scrollTop = $("log").scrollHeight;
       var sl = $("super-log"); if (sl) sl.scrollTop = sl.scrollHeight;

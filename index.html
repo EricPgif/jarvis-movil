@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="manifest" href="manifest.json?v=19" />
+<link rel="manifest" href="manifest.json?v=20" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 <style>
   :root{
@@ -74,6 +74,16 @@
   .me{align-self:flex-end; background:var(--cyan-soft); border:1px solid var(--border-hi); color:var(--text);}
   .jv{align-self:flex-start; background:var(--card); border:1px solid var(--border); color:var(--text);}
   .sys{align-self:center; color:var(--text-muted); font-size:12px; text-align:center;}
+  /* ── Agente trabajando (estilo reactor JARVIS): anillo girando + núcleo latiendo + puntos ── */
+  .msg.agent{display:flex; align-items:center; gap:11px; background:rgba(0,212,255,.07); border-color:var(--border-hi); box-shadow:0 0 16px rgba(0,212,255,.12);}
+  .agent-orb{position:relative; width:20px; height:20px; flex:0 0 auto;}
+  .agent-orb::before{content:""; position:absolute; inset:0; border-radius:50%; border:2px solid var(--cyan); border-top-color:transparent; animation:agspin .8s linear infinite;}
+  .agent-orb::after{content:""; position:absolute; inset:5px; border-radius:50%; background:var(--cyan); box-shadow:0 0 8px var(--cyan); animation:agpulse 1.1s ease-in-out infinite;}
+  @keyframes agspin{to{transform:rotate(360deg)}}
+  @keyframes agpulse{0%,100%{transform:scale(.55); opacity:.35} 50%{transform:scale(1); opacity:.85}}
+  .agent-tx{color:var(--cyan); font-size:13.5px; letter-spacing:.2px;}
+  .agent-tx .dots::after{content:""; animation:agdots 1.3s steps(1,end) infinite;}
+  @keyframes agdots{0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."}}
 
   /* ── Barra de entrada ── */
   .bar{display:flex; gap:8px; padding:10px 12px; flex:0 0 auto; padding-bottom:calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); background:rgba(7,17,29,.6);}
@@ -240,21 +250,21 @@
     </div>
   </div>
 
-  <script src="sfx.js?v=19"></script>
-  <script src="sphere.js?v=19"></script>
-  <script src="memory.js?v=19"></script>
-  <script src="api.js?v=19"></script>
-  <script src="edgetts.js?v=19"></script>
-  <script src="pcvoice.js?v=19"></script>
-  <script src="voice.js?v=19"></script>
-  <script src="deeplinks.js?v=19"></script>
-  <script src="weather.js?v=19"></script>
-  <script src="router.js?v=19"></script>
-  <script src="super.js?v=19"></script>
-  <script src="intro.js?v=19"></script>
-  <script src="clap.js?v=19"></script>
-  <script src="standby.js?v=19"></script>
-  <script src="extras.js?v=19"></script>
-  <script src="movil.js?v=19"></script>
+  <script src="sfx.js?v=20"></script>
+  <script src="sphere.js?v=20"></script>
+  <script src="memory.js?v=20"></script>
+  <script src="api.js?v=20"></script>
+  <script src="edgetts.js?v=20"></script>
+  <script src="pcvoice.js?v=20"></script>
+  <script src="voice.js?v=20"></script>
+  <script src="deeplinks.js?v=20"></script>
+  <script src="weather.js?v=20"></script>
+  <script src="router.js?v=20"></script>
+  <script src="super.js?v=20"></script>
+  <script src="intro.js?v=20"></script>
+  <script src="clap.js?v=20"></script>
+  <script src="standby.js?v=20"></script>
+  <script src="extras.js?v=20"></script>
+  <script src="movil.js?v=20"></script>
 </body>
 </html>

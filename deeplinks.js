@@ -17,7 +17,7 @@
   var APPS = {
     spotify:    { frase: "Abriendo Spotify, señor.",   scheme: "spotify:",                 https: "https://open.spotify.com" },
     youtube:    { frase: "Abriendo YouTube, señor.",   https: "https://www.youtube.com" },
-    whatsapp:   { frase: "Abriendo WhatsApp, señor.",  scheme: "whatsapp://send", android: "com.whatsapp",            intentScheme: "whatsapp", appOnly: true },
+    whatsapp:   { frase: "Abriendo WhatsApp, señor.",  scheme: "whatsapp://", android: "com.whatsapp",            intentScheme: "whatsapp", appOnly: true },
     telegram:   { frase: "Abriendo Telegram, señor.",  scheme: "tg://",           android: "org.telegram.messenger", intentScheme: "tg",       appOnly: true },
     gmail:      { frase: "Abriendo el correo, señor.", https: "https://mail.google.com" },
     correo:     { frase: "Abriendo el correo, señor.", https: "https://mail.google.com" },
