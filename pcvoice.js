@@ -11,6 +11,11 @@
   var DEFAULT_WORKER = "https://rapid-sky-2af7.ericponceal.workers.dev";
   function base() {
     var saved = (localStorage.getItem("mm_tts_worker") || "").trim();
+    // Ignora URLs de EJEMPLO/rotas (el viejo "tunombre") o que no sean http(s) → usa el Worker bueno.
+    if (saved && (/tunombre|tu-?nombre|ejemplo|example|TUNOMBRE/i.test(saved) || !/^https?:\/\/.+\..+/i.test(saved))) {
+      try { localStorage.removeItem("mm_tts_worker"); } catch (e) {}
+      saved = "";
+    }
     return (saved || DEFAULT_WORKER).replace(/\/+$/, "");
   }
 
@@ -35,11 +40,11 @@
       if (unlocked) return;
       try {
         var a = ensureAudio();
-        a.muted = true; a.src = SILENT;
+        a.muted = false; a.src = SILENT;   // WAV silencioso: sin mute "bendice" el elemento para sonar luego
         var p = a.play();
-        if (p && p.then) p.then(function () { try { a.pause(); a.currentTime = 0; } catch (e) {} a.muted = false; unlocked = true; })
-                           .catch(function () { a.muted = false; });
-        else { unlocked = true; a.muted = false; }
+        if (p && p.then) p.then(function () { try { a.pause(); a.currentTime = 0; } catch (e) {} unlocked = true; })
+                           .catch(function () {});
+        else { unlocked = true; }
       } catch (e) {}
     },
     stop: function () {

@@ -104,8 +104,27 @@
     },
   }];
   function workerBase() {
-    var w = (localStorage.getItem("mm_tts_worker") || "").trim() || "https://rapid-sky-2af7.ericponceal.workers.dev";
-    return w.replace(/\/+$/, "");
+    var w = (localStorage.getItem("mm_tts_worker") || "").trim();
+    if (w && (/tunombre|ejemplo|example/i.test(w) || !/^https?:\/\/.+\..+/i.test(w))) w = "";
+    return (w || "https://rapid-sky-2af7.ericponceal.workers.dev").replace(/\/+$/, "");
+  }
+  // ¿La pregunta pide info RECIENTE/en tiempo real? → buscamos en la web ANTES de responder, así no
+  // depende de que MiniMax decida usar la herramienta (a veces no la usa).
+  function needsWeb(t) {
+    // Normaliza (sin acentos) → el \b de regex es ASCII y "pasó"/"falleció" rompían el match.
+    t = " " + (t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") + " ";
+    return /\b(noticias?|hoy|ayer|reciente|recientemente|ultim[oa]s?|ultima hora|en directo|ahora mismo|este ano|2024|2025|2026|falleci|ha muerto|murio|que le paso|que paso|que ha pasado con|resultado|marcador|precio|cotiza|estreno|cuando sale|ultima version)\b/.test(t)
+        || /\b(busca|buscame|googlea|en internet|en la web)\b/.test(t);
+  }
+  function doSearch(q, onStatus) {
+    if (onStatus) { try { onStatus("Buscando en la web: " + q.slice(0, 60)); } catch (e) {} }
+    return fetch(workerBase() + "/search?q=" + encodeURIComponent(q))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var rs = (d && d.results) || [];
+        if (!rs.length) return "";
+        return rs.slice(0, 5).map(function (x, i) { return (i + 1) + ". " + x.title + " — " + (x.snippet || "") + " (" + x.url + ")"; }).join("\n");
+      }).catch(function () { return ""; });
   }
   // Ejecuta una herramienta → devuelve texto para el tool_result.
   function execTool(tu, onStatus) {
@@ -231,7 +250,19 @@
         return txt;
       });
     }
-    return loop(0);
+    // Si la pregunta es de info reciente, BUSCAMOS antes y le damos los resultados a MiniMax
+    // pegados a la propia pregunta (garantiza la búsqueda aunque el modelo no use la herramienta).
+    var pre = needsWeb(userText) ? doSearch(userText, onStatus) : Promise.resolve("");
+    return pre.then(function (info) {
+      if (info) {
+        var i = messages.length - 1;
+        if (messages[i] && messages[i].role === "user" && typeof messages[i].content === "string") {
+          messages[i] = { role: "user", content: messages[i].content +
+            "\n\n[Resultados de búsqueda web de AHORA para responderme; úsalos y cita la fuente brevemente, no digas que no tienes internet]:\n" + info };
+        }
+      }
+      return loop(0);
+    });
   }
 
   // Añade al historial un intercambio resuelto LOCALMENTE (deep links, Modo Super…), para que

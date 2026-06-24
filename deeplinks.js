@@ -51,8 +51,9 @@
   // Abre SOLO la app nativa en Android con un intent (sin browser_fallback_url → si no está
   // la app, el sistema avisa y NO abre la web). Es lo fiable en Android/MIUI.
   function openAndroidIntent(a) {
-    var host = /send/.test(a.scheme || "") ? "send/" : "";
-    var url = "intent://" + host + "#Intent;scheme=" + a.intentScheme + ";package=" + a.android + ";end";
+    // Lanza la app por su actividad LAUNCHER (MAIN) → abre la pantalla principal directamente.
+    // (Con scheme+package, WhatsApp no resolvía y Android abría la Play Store.)
+    var url = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=" + a.android + ";end";
     try { window.location.href = url; } catch (e) {}
   }
 

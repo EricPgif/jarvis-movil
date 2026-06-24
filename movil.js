@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "3.4";
-  var WHATS_NEW = "Empiezas con un solo «Chat principal» (todo tu historial) y creas más con ＋. Correo ahora es Gmail (abre la app). Y las apps que añades salen con su logo (Discord, Netflix, Instagram…).";
+  var APP_VERSION = "3.5";
+  var WHATS_NEW = "WhatsApp ya abre la APP (no la Play Store). El agente busca solo lo reciente (noticias, «qué le pasó a…»). Y voz: ignoro URLs viejas que rompían a Álvaro + botón «Probar voz» en Ajustes.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -276,6 +276,16 @@
     $("cv-clear").addEventListener("click", clearChat);
     $("cv-x").addEventListener("click", closeConvos);
     $("cv-add").addEventListener("click", newConversation);
+    $("cfg-testvoice").addEventListener("click", function () {
+      if (window.PCVoice) PCVoice.unlock();
+      closeSettings();
+      addMsg("Probando la voz de Álvaro, señor…", "sys");
+      if (window.PCVoice) {
+        PCVoice.speak("Hola señor. Soy Jarvis, esta es mi voz.", null, function () {})
+          .then(function () { addMsg("✓ Voz de Álvaro reproducida. ¿La has oído?", "sys"); })
+          .catch(function (e) { addMsg("✗ Falló la voz del PC: " + (e && e.message || e) + ". Por eso suena la del sistema. Dímelo y lo arreglo.", "sys"); });
+      }
+    });
     $("cfg-sfx").addEventListener("click", function () {
       if (!window.sfx) return;
       var on = !window.sfx.enabled; window.sfx.setEnabled(on);
