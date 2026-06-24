@@ -18,6 +18,10 @@
     { re: /\b(sal|salir|cierra|quita|desactiva)\s+(del\s+)?(modo\s+)?super\b/,
       run: function () { if (window.Super) window.Super.hide(); return "Saliendo del modo Super, señor."; } },
 
+    // Reabrir la última app ("vuelve a abrirlo / ábrelo otra vez"). ANTES de la regla genérica "abre".
+    { re: /(vuelve a abrir|reabr[ae]|abrelo|abre lo|abrir (?:de nuevo|otra vez))/,
+      run: function () { return window.Links.reopenLast() || "No recuerdo qué abrir, señor. Dígame qué app."; } },
+
     // Disparadores con nombre (Dexter / Brian / Rita / Cristina)
     { re: /\bdexter\b/,        run: function () { return window.Links.openNamed("dexter"); } },
     { re: /\b(brian|brayan)\b/, run: function () { return window.Links.openNamed("brian"); } },

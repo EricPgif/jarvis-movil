@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "2.6";
-  var WHATS_NEW = "¡La voz del PC (Álvaro) ya suena en el móvil! Generada en la nube, automática y sin configurar nada.";
+  var APP_VERSION = "2.7";
+  var WHATS_NEW = "Memoria inteligente (recuerdo lo importante de ti aunque borres el chat), auto-actualización fiable, WhatsApp/Telegram abren solo en su app, y entiendo «vuelve a abrirlo».";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -49,10 +49,15 @@
     addMsg(text, "me");
     $("text").value = "";
 
+    // Memoria inteligente: aprende hechos del mensaje (nombre, gustos, temas…). Embudo único.
+    if (window.Mem) { try { window.Mem.capture(text); } catch (e) {} }
+
     // 1) ¿Acción local? (abrir app, Modo Super, Dexter, etc.)
     var routed = Router.routeCommand(text);
     if (routed.handled) {
       if (routed.say) { addMsg(routed.say, "jv"); speak(routed.say); }
+      // Guarda el intercambio en el historial para que MiniMax tenga contexto luego.
+      if (window.API && window.API.addExchange && routed.say) window.API.addExchange(text, routed.say);
       return;
     }
     // 2) Si no, va al cerebro (MiniMax).
@@ -213,7 +218,8 @@
       if (window.API && window.API.clearHistory) window.API.clearHistory();
       $("log").innerHTML = ""; var sl = $("super-log"); if (sl) sl.innerHTML = "";
       closeSettings();
-      addMsg("Memoria borrada, señor. Empezamos de cero.", "sys");
+      // Borra SOLO la conversación; los hechos sobre Eric (mm_facts) se conservan.
+      addMsg("Conversación borrada, señor. Sigo recordando lo importante de usted.", "sys");
     });
     $("cfg-sfx").addEventListener("click", function () {
       if (!window.sfx) return;
@@ -243,22 +249,51 @@
     navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(function (reg) {
       _swReg = reg;
       try { reg.update(); } catch (e) {}
+      checkVersion();   // ¿hay versión nueva? (esquiva el CDN)
       setInterval(function () { try { reg.update(); } catch (e) {} }, 60000);
       document.addEventListener("visibilitychange", function () {
-        if (!document.hidden) { try { reg.update(); } catch (e) {} }
+        if (!document.hidden) { try { reg.update(); } catch (e) {} checkVersion(); }
       });
     }).catch(function () {});
   }
-  // Botón manual: fuerza la búsqueda + recarga a la última versión.
+  // Botón manual CONTUNDENTE: borra todas las cachés + desregistra el SW + recarga.
+  // Es la palanca fiable si una versión se quedara pegada.
   function forceUpdate() {
-    addMsg("🔄 Buscando versión nueva, señor…", "sys");
+    addMsg("🔄 Forzando la última versión, señor…", "sys");
     var go = function () { try { window.location.reload(true); } catch (e) { window.location.reload(); } };
-    if (_swReg) {
-      _swReg.update().then(function () {
-        if (_swReg.waiting) { try { _swReg.waiting.postMessage("skipWaiting"); } catch (e) {} }
-        setTimeout(go, 900);
-      }).catch(go);
-    } else { go(); }
+    var jobs = [];
+    try { if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); })); } catch (e) {}
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations)
+        jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+    } catch (e) {}
+    Promise.all(jobs).then(function () { setTimeout(go, 300); }).catch(function () { setTimeout(go, 300); });
+  }
+
+  // Chequeo de versión que ESQUIVA el CDN de GitHub Pages (query única → siempre fresco).
+  // Si hay versión nueva, auto-actualiza UNA vez por sesión (anti-bucle por si el CDN aún
+  // sirve el shell viejo). Recarga silenciosa (decisión de Eric).
+  function checkVersion() {
+    fetch("version.json?_=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (v) {
+        var served = v && v.version;
+        if (!served || served === APP_VERSION) return;          // ya estás en la última
+        var tried = sessionStorage.getItem("jv_update_tried");
+        if (tried === served) {                                  // ya lo intenté y el CDN sigue viejo
+          addMsg("Hay una versión nueva (v" + served + "), señor; el servidor aún sirve la anterior por caché. Vuelva a abrir la app en unos minutos.", "sys");
+          return;
+        }
+        try { sessionStorage.setItem("jv_update_tried", served); } catch (e) {}
+        if (_swReg) {                                            // empuja el SW nuevo → controllerchange recarga solo
+          _swReg.update().then(function () {
+            if (_swReg.waiting) { try { _swReg.waiting.postMessage("skipWaiting"); } catch (e) {} }
+          }).catch(function () {});
+          setTimeout(function () { try { window.location.reload(); } catch (e) {} }, 1500);
+        } else {
+          try { window.location.reload(); } catch (e) {}
+        }
+      }).catch(function () {});
   }
   function notifyVersion() {
     try {

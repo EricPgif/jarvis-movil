@@ -25,7 +25,7 @@
     catch (e) { return []; }
   }
   function saveHist() {
-    try { localStorage.setItem("mm_history", JSON.stringify(history.slice(-40))); } catch (e) {}
+    try { localStorage.setItem("mm_history", JSON.stringify(history.slice(-30))); } catch (e) {}
   }
   var history = loadHist();   // [{role, content}]
 
@@ -63,15 +63,17 @@
       if (t && t.textContent && t.textContent !== "--")
         wx = " Tiempo ahora donde esta el: " + t.textContent + " grados, " + (d ? d.textContent : "") + ".";
     } catch (e) {}
+    var mem = "";
+    try { if (window.Mem && window.Mem.block) { var b = window.Mem.block(); if (b) mem = "\n\n" + b; } } catch (e) {}
     return BASE_PROMPT + "\n\nCONTEXTO REAL DE AHORA MISMO: es " + ahora + "." + wx +
-           " Usa estos datos cuando pregunte por la fecha, la hora o el tiempo (no inventes fechas).";
+           " Usa estos datos cuando pregunte por la fecha, la hora o el tiempo (no inventes fechas)." + mem;
   }
 
   function askMiniMax(userText) {
     var key = CFG.key;
     if (!key) return Promise.reject(new Error("sin key"));
     history.push({ role: "user", content: userText });
-    if (history.length > 20) history = history.slice(-20);
+    if (history.length > 30) history = history.slice(-30);
     var payload = {
       model: CFG.model, max_tokens: 1536, temperature: 0.55,
       system: buildSystem(), thinking: { type: "disabled" }, messages: history,
@@ -108,9 +110,19 @@
     });
   }
 
+  // Añade al historial un intercambio resuelto LOCALMENTE (deep links, Modo Super…), para que
+  // MiniMax tenga contexto en lo siguiente ("abre WhatsApp" → "vuelve a abrirlo").
+  function addExchange(userText, assistantText) {
+    if (!userText) return;
+    history.push({ role: "user", content: String(userText) });
+    history.push({ role: "assistant", content: String(assistantText || "") });
+    if (history.length > 30) history = history.slice(-30);
+    saveHist();
+  }
+
   window.CFG = CFG;
   window.API = {
-    askMiniMax: askMiniMax, SYSTEM: SYSTEM,
+    askMiniMax: askMiniMax, SYSTEM: SYSTEM, addExchange: addExchange,
     getHistory: function () { return history.slice(); },     // para mostrar el chat pasado
     clearHistory: function () { history = []; try { localStorage.removeItem("mm_history"); } catch (e) {} },
   };

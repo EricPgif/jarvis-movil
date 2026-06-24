@@ -17,8 +17,8 @@
   var APPS = {
     spotify:    { frase: "Abriendo Spotify, señor.",   scheme: "spotify:",                 https: "https://open.spotify.com" },
     youtube:    { frase: "Abriendo YouTube, señor.",   https: "https://www.youtube.com" },
-    whatsapp:   { frase: "Abriendo WhatsApp, señor.",  scheme: "whatsapp://send",          appOnly: true },
-    telegram:   { frase: "Abriendo Telegram, señor.",  scheme: "tg://",                    appOnly: true },
+    whatsapp:   { frase: "Abriendo WhatsApp, señor.",  scheme: "whatsapp://send", android: "com.whatsapp",            intentScheme: "whatsapp", appOnly: true },
+    telegram:   { frase: "Abriendo Telegram, señor.",  scheme: "tg://",           android: "org.telegram.messenger", intentScheme: "tg",       appOnly: true },
     gmail:      { frase: "Abriendo el correo, señor.", https: "https://mail.google.com" },
     correo:     { frase: "Abriendo el correo, señor.", https: "https://mail.google.com" },
     calendario: { frase: "Abriendo tu calendario, señor.", https: "https://calendar.google.com" },
@@ -31,6 +31,25 @@
   // Funciones solo-PC: no se pueden en el móvil. Mensaje honesto.
   var PC_ONLY = ["terminal", "cmd", "consola", "explorador", "archivos", "word", "excel",
                  "vs code", "vscode", "paint", "bloc de notas", "captura", "screenshot"];
+
+  // ── Plataforma ──
+  function isAndroid() { return /android/i.test(navigator.userAgent); }
+  function isIOS() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+           (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+
+  // Abre SOLO la app nativa en Android con un intent (sin browser_fallback_url → si no está
+  // la app, el sistema avisa y NO abre la web). Es lo fiable en Android/MIUI.
+  function openAndroidIntent(a) {
+    var host = /send/.test(a.scheme || "") ? "send/" : "";
+    var url = "intent://" + host + "#Intent;scheme=" + a.intentScheme + ";package=" + a.android + ";end";
+    try { window.location.href = url; } catch (e) {}
+  }
+
+  // Última app abierta (para "vuelve a abrirlo").
+  var lastAppKey = null;
+  try { lastAppKey = localStorage.getItem("mm_last_app") || null; } catch (e) {}
 
   // Abre una URL/scheme. Para schemes (spotify:, tg:, whatsapp://) intenta el nativo y,
   // si tras un momento seguimos visibles (no se abrió la app), cae al https.
@@ -64,9 +83,20 @@
   function openApp(key) {
     var a = APPS[key];
     if (!a) return null;
-    if (a.appOnly && a.scheme) open(a.scheme, null);   // SOLO la app (sin abrir el navegador)
-    else open(a.scheme || a.https, a.https);
+    if (a.appOnly) {
+      // SOLO la app, nunca la web.
+      if (isAndroid() && a.android) openAndroidIntent(a);   // intent (lo más fiable en Android/MIUI)
+      else if (a.scheme) { try { window.location.href = a.scheme; } catch (e) {} }   // iOS u otros: scheme puro
+    } else {
+      open(a.scheme || a.https, a.https);
+    }
+    lastAppKey = key; try { localStorage.setItem("mm_last_app", key); } catch (e) {}
     return a.frase;
+  }
+  // Reabre la última app ("vuelve a abrirlo / otra vez").
+  function reopenLast() {
+    var k = lastAppKey || (function () { try { return localStorage.getItem("mm_last_app"); } catch (e) { return null; } })();
+    return k ? openApp(k) : null;
   }
   function openNamed(key) {
     var n = NAMED[key];
@@ -86,5 +116,5 @@
   }
 
   window.Links = { open: open, openApp: openApp, openNamed: openNamed, searchMusic: searchMusic,
-                   isPcOnly: isPcOnly, APPS: APPS, NAMED: NAMED, CLAP: NAMED.clap };
+                   reopenLast: reopenLast, isPcOnly: isPcOnly, APPS: APPS, NAMED: NAMED, CLAP: NAMED.clap };
 })();
