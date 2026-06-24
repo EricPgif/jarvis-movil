@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "3.1";
-  var WHATS_NEW = "Arreglada la VOZ del PC (Álvaro) en el móvil: ahora suena de verdad. Y «Buscar actualización» también aparece en la app instalada (no solo en web).";
+  var APP_VERSION = "3.2";
+  var WHATS_NEW = "Ahora el agente BUSCA solo (sin pedir permiso) cuando preguntas por algo reciente. E iconos de las apps con su logo (Spotify, YouTube, WhatsApp, Telegram…).";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──

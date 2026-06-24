@@ -50,8 +50,11 @@
     "  navegador, camara. Si te piden 'pon musica' o 'abre X', se abre solo.",
     "- El control del PC (archivos, programas) necesita el JARVIS de escritorio; dilo sin drama.",
     "",
-    "LIMITES: aqui no tienes internet en vivo, asi que para NOTICIAS DE HOY o datos en tiempo real",
-    "avisalo con naturalidad y ofrece abrir una web; para todo lo demas responde TU con tu conocimiento.",
+    "BUSQUEDA WEB: TIENES una herramienta de busqueda (web_search). Cuando te pregunten por algo",
+    "RECIENTE, noticias, eventos, un youtuber/personaje y que le ha pasado, datos en tiempo real, o",
+    "algo que no sepas con certeza, USALA TU MISMO directamente: NO pidas permiso, NO digas que no",
+    "tienes internet, NO ofrezcas 'abrir el navegador'. Busca y responde con lo que encuentres,",
+    "citando la fuente brevemente. Para lo que ya sabes de sobra, responde sin buscar.",
   ].join("\n");
 
   function buildSystem() {
@@ -183,6 +186,27 @@
             messages.push({ role: "user", content: results });
             return loop(depth + 1);
           });
+        }
+        // MiniMax-M2 a veces pide la búsqueda como TEXTO (<minimax:tool_call><invoke name="web_search">
+        // <parameter name="query">…) en vez del formato formal. Lo detectamos y buscamos igualmente.
+        var rawText = blocks.filter(function (b) { return b && b.type === "text"; }).map(function (b) { return b.text || ""; }).join(" ");
+        var ts = rawText.match(/web_search[\s\S]*?name\s*=\s*["']?query["']?\s*>\s*([^<]+?)\s*<\/parameter>/i);
+        if (ts && depth < 3) {
+          var q = ts[1].trim();
+          if (onStatus) { try { onStatus("Buscando en la web: " + q); } catch (e) {} }
+          return fetch(workerBase() + "/search?q=" + encodeURIComponent(q))
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              var rs = (d && d.results) || [];
+              var info = rs.length ? rs.slice(0, 5).map(function (x, i) { return (i + 1) + ". " + x.title + " — " + (x.snippet || "") + " (" + x.url + ")"; }).join("\n") : "Sin resultados.";
+              messages.push({ role: "assistant", content: "(buscando en la web: " + q + ")" });
+              messages.push({ role: "user", content: "Resultados de la búsqueda web para \"" + q + "\":\n" + info + "\n\nResponde ahora a mi pregunta usando esto, en español de España, sin mostrar este bloque ni enlaces largos." });
+              return loop(depth + 1);
+            })
+            .catch(function () {
+              var t = cleanText(blocks) || "No pude buscar ahora mismo, señor.";
+              history.push({ role: "assistant", content: t }); saveHist(); return t;
+            });
         }
         var txt = cleanText(blocks);
         if (!txt) txt = "A su servicio, señor.";   // si solo había markup, no dejes el globo vacío
