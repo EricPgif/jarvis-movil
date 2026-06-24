@@ -63,9 +63,16 @@ function connectId() {
 async function synth(text, voice, rate, pitch) {
   const gec = await secMsGec();
   const wssUrl = `${WSS}?TrustedClientToken=${TRUSTED_TOKEN}&Sec-MS-GEC=${gec}&Sec-MS-GEC-Version=${GEC_VERSION}`;
-  const resp = await fetch(wssUrl, { headers: { Upgrade: "websocket" } });
+  const resp = await fetch(wssUrl, { headers: {
+    Upgrade: "websocket",
+    // Microsoft rechaza el handshake si no llegan estas cabeceras (son las que envía edge-tts).
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
+    "Origin": "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold",
+    "Pragma": "no-cache",
+    "Cache-Control": "no-cache",
+  }});
   const ws = resp.webSocket;
-  if (!ws) throw new Error("sin WebSocket (¿endpoint cambió?)");
+  if (!ws) throw new Error("sin WebSocket (status " + resp.status + ")");
   ws.accept();
 
   return await new Promise((resolve, reject) => {
