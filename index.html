@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="manifest" href="manifest.json?v=36" />
+<link rel="manifest" href="manifest.json?v=37" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 <style>
   :root{
@@ -268,6 +268,19 @@
       <div class="hint" style="margin-top:2px">Déjalo VACÍO para usar la voz de JARVIS de las pelis (AlvaroNeural) por defecto. Solo pon una URL si tienes tu propio Worker.</div>
       <button class="full" id="cfg-testvoice" style="background:transparent;color:var(--cyan);border:1px solid var(--border-hi);margin-top:8px;font-weight:600">🔊 Probar voz de Álvaro</button>
 
+      <label style="margin-top:14px">Voz PREMIUM · ElevenLabs (opcional)</label>
+      <input id="cfg-el-key" type="text" placeholder="API key de ElevenLabs (xi-...)" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <div class="hint" style="margin-top:2px">Voz tipo mayordomo británico, calidad top. Gratis hasta ~10.000 caracteres/mes (luego se corta hasta el mes siguiente). Saca la key en elevenlabs.io → API Keys. Déjalo vacío para usar la voz gratis de siempre.</div>
+      <select id="cfg-el-voice" style="width:100%;margin-top:8px;padding:11px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--text)">
+        <option value="JBFqnCBsd6RMkjVDRZzb">George — británico, cálido (recomendada)</option>
+        <option value="onwK4e9ZLuTAKqWW03F9">Daniel — británico, autoritario</option>
+      </select>
+      <div class="toggle-row">
+        <div class="tx">Usar voz premium (ElevenLabs)<div class="hint" style="margin-top:2px">Si está ON y hay key, JARVIS habla con esa voz. Si no, usa la gratis.</div></div>
+        <div class="sw" id="cfg-el-on"></div>
+      </div>
+      <button class="full" id="cfg-el-test" style="background:transparent;color:var(--cyan);border:1px solid var(--border-hi);margin-top:4px;font-weight:600">🔊 Probar voz premium</button>
+
       <div class="toggle-row">
         <div class="tx">Sonidos de interfaz 🔊<div class="hint" style="margin-top:2px">Ticks al colocarse las apps y al tocar</div></div>
         <div class="sw" id="cfg-sfx"></div>
@@ -332,22 +345,23 @@
     </div>
   </div>
 
-  <script src="sfx.js?v=36"></script>
-  <script src="sphere.js?v=36"></script>
-  <script src="appicons.js?v=36"></script>
-  <script src="memory.js?v=36"></script>
-  <script src="api.js?v=36"></script>
-  <script src="edgetts.js?v=36"></script>
-  <script src="pcvoice.js?v=36"></script>
-  <script src="voice.js?v=36"></script>
-  <script src="deeplinks.js?v=36"></script>
-  <script src="weather.js?v=36"></script>
-  <script src="router.js?v=36"></script>
-  <script src="super.js?v=36"></script>
-  <script src="intro.js?v=36"></script>
-  <script src="clap.js?v=36"></script>
-  <script src="standby.js?v=36"></script>
-  <script src="extras.js?v=36"></script>
-  <script src="movil.js?v=36"></script>
+  <script src="sfx.js?v=37"></script>
+  <script src="sphere.js?v=37"></script>
+  <script src="appicons.js?v=37"></script>
+  <script src="memory.js?v=37"></script>
+  <script src="api.js?v=37"></script>
+  <script src="edgetts.js?v=37"></script>
+  <script src="pcvoice.js?v=37"></script>
+  <script src="elevenlabs.js?v=37"></script>
+  <script src="voice.js?v=37"></script>
+  <script src="deeplinks.js?v=37"></script>
+  <script src="weather.js?v=37"></script>
+  <script src="router.js?v=37"></script>
+  <script src="super.js?v=37"></script>
+  <script src="intro.js?v=37"></script>
+  <script src="clap.js?v=37"></script>
+  <script src="standby.js?v=37"></script>
+  <script src="extras.js?v=37"></script>
+  <script src="movil.js?v=37"></script>
 </body>
 </html>

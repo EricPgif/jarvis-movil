@@ -25,6 +25,7 @@
   // elemento <audio>) como la del sistema (speechSynthesis).
   function unlock() {
     try { if (window.PCVoice && window.PCVoice.unlock) window.PCVoice.unlock(); } catch (e) {}
+    try { if (window.ElevenTTS && window.ElevenTTS.unlock) window.ElevenTTS.unlock(); } catch (e) {}
     if (_unlocked || !("speechSynthesis" in window)) return;
     _unlocked = true;
     try { var u = new SpeechSynthesisUtterance(""); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
@@ -64,7 +65,17 @@
     cancel();
     var clean = cleanForTTS(text);
     if (!clean) { if (onend) onend(); return; }
-    // 1) Voz del PC (es-ES-AlvaroNeural) por el Worker. Si falla ANTES de sonar → voz del sistema.
+    // 0) Voz PREMIUM ElevenLabs si Eric la activó (con key). Si falla → cae a la voz del PC/sistema.
+    if (window.ElevenTTS && window.ElevenTTS.enabled && window.ElevenTTS.enabled() && window.ElevenTTS.available && window.ElevenTTS.available()) {
+      var begunEl = false;
+      window.ElevenTTS.speak(clean, function () { begunEl = true; if (onstart) onstart(); }, onend)
+        .catch(function () { if (!begunEl) speakPC(clean, onstart, onend); else if (onend) onend(); });
+      return;
+    }
+    speakPC(clean, onstart, onend);
+  }
+  // Voz del PC (AlvaroNeural por el Worker) con respaldo a la del sistema.
+  function speakPC(clean, onstart, onend) {
     if (window.PCVoice && window.PCVoice.available) {
       var begun = false;
       window.PCVoice.speak(clean, function () { begun = true; if (onstart) onstart(); }, onend)
@@ -76,6 +87,7 @@
   function cancel() {
     try { speechSynthesis.cancel(); } catch (e) {}
     try { if (window.PCVoice) window.PCVoice.stop(); } catch (e) {}
+    try { if (window.ElevenTTS) window.ElevenTTS.stop(); } catch (e) {}
     try { if (window.EdgeTTS) window.EdgeTTS.stop(); } catch (e) {}
   }
 

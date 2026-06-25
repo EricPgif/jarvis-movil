@@ -17,10 +17,10 @@
   var APPS = {
     spotify:    { frase: "Abriendo Spotify, señor.",   android: "com.spotify.music", scheme: "spotify:",   https: "https://open.spotify.com" },
     youtube:    { frase: "Abriendo YouTube, señor.",   android: "com.google.android.youtube", https: "https://www.youtube.com" },
-    whatsapp:   { frase: "Abriendo WhatsApp, señor.",  scheme: "whatsapp://", android: "com.whatsapp",            intentScheme: "whatsapp", appOnly: true },
-    telegram:   { frase: "Abriendo Telegram, señor.",  scheme: "tg://",           android: "org.telegram.messenger", intentScheme: "tg",       appOnly: true },
-    gmail:      { frase: "Abriendo Gmail, señor.", scheme: "googlegmail://", android: "com.google.android.gm", appOnly: true },
-    correo:     { frase: "Abriendo Gmail, señor.", scheme: "googlegmail://", android: "com.google.android.gm", appOnly: true },
+    whatsapp:   { frase: "Abriendo WhatsApp, señor.",  scheme: "whatsapp://", android: "com.whatsapp",            https: "https://wa.me" },
+    telegram:   { frase: "Abriendo Telegram, señor.",  scheme: "tg://",           android: "org.telegram.messenger", https: "https://t.me" },
+    gmail:      { frase: "Abriendo Gmail, señor.", scheme: "googlegmail://", android: "com.google.android.gm", https: "https://mail.google.com" },
+    correo:     { frase: "Abriendo Gmail, señor.", scheme: "googlegmail://", android: "com.google.android.gm", https: "https://mail.google.com" },
     calendario: { frase: "Abriendo tu calendario, señor.", android: "com.google.android.calendar", https: "https://calendar.google.com" },
     navegador:  { frase: "Abriendo Chrome, señor.",  android: "com.android.chrome", scheme: "googlechrome://", https: "https://www.google.com" },
     chrome:     { frase: "Abriendo Chrome, señor.",  android: "com.android.chrome", scheme: "googlechrome://", https: "https://www.google.com" },
@@ -47,15 +47,20 @@
            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   }
 
-  // Lanza la app por su actividad LAUNCHER (MAIN). Con browser_fallback_url: si la app NO está,
-  // va a la WEB (no a la Play Store). Es el respaldo para apps SIN esquema nativo (YouTube, etc.).
-  // (Las apps con esquema usan el esquema directo en openDirect, que nunca pasa por Play Store.)
+  // Abre la app en Android de la forma MÁS FIABLE: intent:// con la URL https OFICIAL como dato +
+  // package + browser_fallback_url. Los App Links abren la APP instalada; si no está, va a la WEB
+  // (NUNCA a la Play Store). Esto SÍ funciona en MIUI (los esquemas 'bare' como whatsapp:// NO).
   function openAndroidIntent(a) {
-    var web = a.web || a.https || "";
-    var url = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=" + a.android + ";" +
-              ((web && !a.appOnly) ? ("S.browser_fallback_url=" + encodeURIComponent(web) + ";") : "") +
-              "end";
-    try { window.location.href = url; } catch (e) {}
+    var web = a.web || a.https || (/^https?:/i.test(a.url || "") ? a.url : "");
+    var pkg = a.android || "";
+    if (pkg && web) {
+      var hostPath = web.replace(/^https?:\/\//i, "");
+      var url = "intent://" + hostPath + "#Intent;scheme=https;package=" + pkg +
+                ";S.browser_fallback_url=" + encodeURIComponent(web) + ";end";
+      try { window.location.href = url; return; } catch (e) {}
+    }
+    if (web) { try { window.location.href = web; } catch (e) {} return; }
+    if (pkg) { try { window.location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=" + pkg + ";end"; } catch (e) {} }
   }
 
   // Última app abierta (para "vuelve a abrirlo").
@@ -91,19 +96,20 @@
     }
   }
 
-  // Abre un descriptor {android, scheme, web/https, url, appOnly}. En Android, si hay PACKAGE,
-  // lanza la APP por su launcher (SOLO app, nunca web). Si no, scheme y, si toca, respaldo web.
+  // Abre un descriptor {android, scheme, web/https, url}.
   function openDirect(d) {
     if (!d) return;
     var web = d.web || d.https || (/^https?:/i.test(d.url || "") ? d.url : "");
-    var fb = d.appOnly ? null : web;
-    // 1) Esquema nativo (whatsapp://, tg://, spotify:…): abre la APP directa. NUNCA pasa por Play Store
-    //    (la Play Store solo aparece con los intent: de paquete). Si la app no está y NO es appOnly,
-    //    open() detecta que no se abrió y cae a la web.
-    if (d.scheme) { open(d.scheme, fb); return; }
-    // 2) Sin esquema pero con package en Android: intent de lanzador con respaldo a WEB (no Play Store).
-    if (isAndroid() && d.android) { openAndroidIntent(d); return; }
-    // 3) Web normal.
+    if (isAndroid()) {
+      // ANDROID: lo fiable es el intent:// con package + URL https oficial (App Links → abre la APP;
+      // si no está, web; nunca Play Store). Los esquemas 'bare' (whatsapp://, tg://) NO abren en MIUI.
+      if (d.android) { openAndroidIntent(d); return; }
+      if (web) { try { window.location.href = web; } catch (e) {} return; }
+      if (d.scheme) { open(d.scheme, null); return; }
+      return;
+    }
+    // iOS / escritorio: esquema nativo primero, con respaldo web.
+    if (d.scheme) { open(d.scheme, web || null); return; }
     open((/^https?:/i.test(d.url || "") ? d.url : "") || web, web);
   }
   function openApp(key) {

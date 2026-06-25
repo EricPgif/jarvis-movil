@@ -516,7 +516,10 @@
   }
   function pickVisionText(d) {
     var t = ""; try { t = d.choices[0].message.content; if (Array.isArray(t)) t = t.map(function (p) { return (p && p.text) || ""; }).join(" "); } catch (e) {}
-    return String(t || "");
+    // Igual que el chat: el modelo de visión a veces suelta su razonamiento en INGLÉS
+    // dentro de <think>…</think>/<reasoning>…</reasoning> y luego la respuesta buena.
+    // Limpiamos con la MISMA lógica que cleanText (incluido el barrido CJK).
+    return cleanText([{ type: "text", text: String(t || "") }]);
   }
   function analyzeImageDirect(dataUrl, question) {
     return fetch(mmHost() + "/v1/chat/completions", {
@@ -536,7 +539,8 @@
       var d = null; try { d = JSON.parse(t); } catch (e) {}
       if (!d) throw new Error("worker-no-vision");
       if (d.error) throw new Error("mm:" + d.error);
-      return d.text || "";
+      // Mismo limpiado que la vía directa: fuera <think>/<reasoning> y CJK.
+      return cleanText([{ type: "text", text: String(d.text || "") }]);
     });
   }
   function analyzeImage(dataUrl, question) {

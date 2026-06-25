@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "4.6";
-  var WHATS_NEW = "¡Ahora ANALIZO IMÁGENES! Toca el clip 📎, sube una foto y pregúntame «¿qué sale aquí?» — la veo y te respondo (con MiniMax M3). Como un ChatGPT con ojos, señor.";
+  var APP_VERSION = "4.7";
+  var WHATS_NEW = "Arreglos: al analizar imágenes ya no sale texto raro en inglés; abrir apps (WhatsApp, YouTube, Telegram…) abre la APP de verdad; y el contador de mensajes muestra el número real. NUEVO: voz PREMIUM opcional con ElevenLabs (voz de mayordomo británico) — mete tu key en Ajustes.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -245,6 +245,7 @@
 
     // ¿Alarmas/recordatorios? (HABLADOS, mientras la app esté abierta)
     if (/\b(borra|quita|elimina|cancela|para)\b.*\balarmas?\b|\bcancela.*recordatorios?\b/.test(nrm)) {
+      try { var na0 = nativeAlarm(); if (na0) loadAlarms().forEach(function (x) { if (x.native) { try { na0.cancel({ id: x.id }).catch(function () {}); } catch (e) {} } }); } catch (e) {}
       saveAlarms([]); var rep = "Alarmas y recordatorios borrados, señor."; addMsg(rep, "jv"); speak(rep); return;
     }
     if (/\b(mis|cuantas|que|lista de)\s+alarmas?\b|\bque recordatorios\b/.test(nrm)) {
@@ -408,6 +409,11 @@
   function loadAlarms() { try { return JSON.parse(localStorage.getItem("mm_alarms") || "[]") || []; } catch (e) { return []; } }
   function saveAlarms(a) { try { localStorage.setItem("mm_alarms", JSON.stringify(a)); } catch (e) {} }
   function pad2(n) { return String(n).padStart(2, "0"); }
+  // Plugin NATIVO de alarmas (solo existe dentro del APK): suena/habla con la app cerrada.
+  function nativeAlarm() {
+    try { if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.registerPlugin) return window.Capacitor.registerPlugin("JarvisAlarm"); } catch (e) {}
+    return null;
+  }
   var _alarmTimer = null;
   function startAlarmWatch() { if (_alarmTimer) return; _alarmTimer = setInterval(checkAlarms, 15000); checkAlarms(); }
   function checkAlarms() {
@@ -416,6 +422,7 @@
     if (!due.length) return;
     saveAlarms(a.filter(function (x) { return x.at > now; }));
     due.forEach(function (al) {
+      if (al.native) return;   // la alarma NATIVA ya habla sola (aunque la app esté cerrada): no duplicar
       var phrase = "Señor, " + (al.label || "tiene su aviso") + ".";
       addMsg("⏰ " + phrase, "jv");
       try { if (window.sfx && window.sfx.beep) window.sfx.beep(); } catch (e) {}
@@ -451,11 +458,23 @@
     if (mL && mL[1] && mL[1].trim().length > 2 && !/^\d/.test(mL[1].trim()) && !/^las?\b/i.test(mL[1].trim())) {
       label = "le recuerdo: " + mL[1].trim();
     }
-    var a = loadAlarms(); a.push({ id: "a" + Date.now(), at: at, label: label }); saveAlarms(a);
+    var id = "a" + Date.now();
+    var w = new Date(at), hhmm = pad2(w.getHours()) + ":" + pad2(w.getMinutes());
+    var labelTxt = label ? (" — " + label.replace(/^le recuerdo: /, "")) : "";
+    var spoken = label ? label.replace(/^le recuerdo: /, "le recuerdo, ") : "tiene su aviso";
+    // En el APK: alarma NATIVA (habla aunque la app esté cerrada).
+    var na = nativeAlarm();
+    if (na) {
+      try { na.set({ at: at, id: id, phrase: "Señor, " + spoken + "." }).catch(function () {}); } catch (e) {}
+      var an = loadAlarms(); an.push({ id: id, at: at, label: label, native: true }); saveAlarms(an);
+      startAlarmWatch();
+      return "Hecho, señor. Le avisaré a las " + hhmm + labelTxt + ", aunque cierre la app.";
+    }
+    // En la web: temporizador interno (solo con la app abierta).
+    var a = loadAlarms(); a.push({ id: id, at: at, label: label }); saveAlarms(a);
     startAlarmWatch();
     try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
-    var w = new Date(at), hhmm = pad2(w.getHours()) + ":" + pad2(w.getMinutes());
-    return "Hecho, señor. Le avisaré a las " + hhmm + (label ? (" — " + label.replace(/^le recuerdo: /, "")) : "") + ". (Mientras JARVIS esté abierto; la alarma con la app cerrada llegará con la app nativa.)";
+    return "Hecho, señor. Le avisaré a las " + hhmm + labelTxt + ". (Mientras JARVIS esté abierto; la alarma con la app cerrada va en la app instalable.)";
   }
 
   // Detecta "envía a X por WhatsApp: mensaje" → {msg, number}. Requiere mencionar WhatsApp.
@@ -494,7 +513,7 @@
     box.innerHTML = API.listConvos().map(function (c) {
       return '<div class="cv-row' + (c.active ? " on" : "") + '">' +
         '<button class="cv-pick" data-id="' + c.id + '">' + escapeHtml(c.name) +
-        '<small>' + Math.floor(c.count / 2) + ' mensajes</small></button>' +
+        '<small>' + c.count + ' mensajes</small></button>' +
         '<button class="cv-edit" data-id="' + c.id + '" aria-label="Renombrar">✎</button>' +
         '<button class="cv-del" data-id="' + c.id + '" aria-label="Borrar">🗑</button></div>';
     }).join("");
@@ -574,6 +593,11 @@
     if (window.sfx) $("cfg-sfx").classList.toggle("on", window.sfx.enabled);
     $("cfg-clap").classList.toggle("on", CFG.clap);
     $("cfg-wake").classList.toggle("on", CFG.wake);
+    try {
+      $("cfg-el-key").value = localStorage.getItem("el_key") || "";
+      $("cfg-el-voice").value = localStorage.getItem("el_voice") || "JBFqnCBsd6RMkjVDRZzb";
+      $("cfg-el-on").classList.toggle("on", localStorage.getItem("el_on") === "1");
+    } catch (e) {}
     var vl = $("ver-label"); if (vl) vl.textContent = "JARVIS móvil · v" + APP_VERSION;
     $("modal").classList.add("show");
   }
@@ -583,6 +607,11 @@
     localStorage.setItem("mm_base", ($("cfg-base").value.trim() || "https://api.minimax.io/anthropic"));
     localStorage.setItem("mm_model", ($("cfg-model").value.trim() || "MiniMax-M2"));
     localStorage.setItem("mm_tts_worker", ($("cfg-tts").value.trim().replace(/\/+$/, "")));
+    try {
+      localStorage.setItem("el_key", $("cfg-el-key").value.trim());
+      localStorage.setItem("el_voice", $("cfg-el-voice").value);
+      localStorage.setItem("el_on", $("cfg-el-on").classList.contains("on") ? "1" : "0");
+    } catch (e) {}
     closeSettings();
     if (CFG.key) addMsg("Configuración guardada, señor. ¿En qué puedo ayudarle?", "jv");
   }
@@ -662,6 +691,21 @@
         PCVoice.speak("Hola señor. Soy Jarvis, esta es mi voz.", null, function () {})
           .then(function () { addMsg("✓ Voz de Álvaro reproducida. ¿La has oído?", "sys"); })
           .catch(function (e) { addMsg("✗ Falló la voz del PC: " + (e && e.message || e) + ". Por eso suena la del sistema. Dímelo y lo arreglo.", "sys"); });
+      }
+    });
+    $("cfg-el-on").addEventListener("click", function () { this.classList.toggle("on"); });
+    $("cfg-el-test").addEventListener("click", function () {
+      var k = $("cfg-el-key").value.trim();
+      if (!k) { addMsg("Mete primero la API key de ElevenLabs, señor.", "sys"); return; }
+      // Guarda key/voz al momento para la prueba.
+      try { localStorage.setItem("el_key", k); localStorage.setItem("el_voice", $("cfg-el-voice").value); } catch (e) {}
+      if (window.ElevenTTS) ElevenTTS.unlock();
+      closeSettings();
+      addMsg("Probando la voz premium (ElevenLabs), señor…", "sys");
+      if (window.ElevenTTS) {
+        ElevenTTS.test()
+          .then(function () { addMsg("✓ Voz premium reproducida. Actívala con el interruptor para usarla siempre.", "sys"); })
+          .catch(function (e) { addMsg("✗ Falló ElevenLabs: " + (e && e.message || e) + ". Revisa la key o el saldo (10.000 caracteres/mes en el plan gratis).", "sys"); });
       }
     });
     $("cfg-sfx").addEventListener("click", function () {
