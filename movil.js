@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "4.5";
-  var WHATS_NEW = "¡Mogollón nuevo! Ya hago VÍDEOS («hazme un vídeo de…», tarda minutos) y WEBS («hazme una web de…»). Las imágenes se ven en GRANDE con zoom al tocarlas (y se descargan). Multi-agente: «busca tendencias y hazme un vídeo». Puedes COPIAR el texto del chat (mantén pulsado o el botón ⧉), el chat es más visual, y pongo ALARMAS que te hablo a la hora. Arreglado: ya no abre YouTube ni se queda en «A su servicio».";
+  var APP_VERSION = "4.6";
+  var WHATS_NEW = "¡Ahora ANALIZO IMÁGENES! Toca el clip 📎, sube una foto y pregúntame «¿qué sale aquí?» — la veo y te respondo (con MiniMax M3). Como un ChatGPT con ojos, señor.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -147,6 +147,65 @@
       setTimeout(function () { try { URL.revokeObjectURL(u); } catch (e) {} }, 5000);
     }).catch(function () {
       addMsg("Para guardarla, mantén pulsada la imagen y elige «Descargar imagen», señor.", "sys");
+    });
+  }
+  // ── Subir una imagen y que JARVIS la ANALICE (visión, como ChatGPT) ──
+  // Escala la foto a máx 1024px (las fotos del móvil son enormes) → dataURL JPEG.
+  function fileToScaledDataUrl(file, maxDim) {
+    return new Promise(function (resolve, reject) {
+      var rd = new FileReader();
+      rd.onload = function () {
+        var im = new Image();
+        im.onload = function () {
+          var w = im.width, h = im.height, m = maxDim || 1024;
+          if (w > m || h > m) { if (w >= h) { h = Math.round(h * m / w); w = m; } else { w = Math.round(w * m / h); h = m; } }
+          try { var c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(im, 0, 0, w, h); resolve(c.toDataURL("image/jpeg", 0.85)); }
+          catch (e) { resolve(rd.result); }
+        };
+        im.onerror = function () { resolve(rd.result); };
+        im.src = rd.result;
+      };
+      rd.onerror = reject;
+      rd.readAsDataURL(file);
+    });
+  }
+  function addUserImage(dataUrl) {
+    function build() {
+      var wrap = document.createElement("div"); wrap.className = "msg me img";
+      var img = document.createElement("img"); img.className = "genimg"; img.src = dataUrl;
+      img.addEventListener("click", function () { openLightbox(dataUrl); });
+      wrap.appendChild(img); return wrap;
+    }
+    var d = build(); var log = $("log"); log.appendChild(d); log.scrollTop = log.scrollHeight;
+    var slog = $("super-log"); if (slog) { var c = build(); slog.appendChild(c); slog.scrollTop = slog.scrollHeight; }
+    return d;
+  }
+  function onImagePicked(e) {
+    var f = e.target.files && e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    if (!CFG.key) { addMsg("Falta tu API key de MiniMax, señor. Pulsa el engranaje ⚙.", "jv"); openSettings(); return; }
+    if (busy) return;
+    var question = ($("text").value || "").trim(); $("text").value = "";
+    fileToScaledDataUrl(f, 1024).then(function (dataUrl) { analyzeUserImage(dataUrl, question); })
+      .catch(function () { addMsg("No pude leer la imagen, señor.", "sys"); });
+  }
+  function analyzeUserImage(dataUrl, question) {
+    Voice.unlock();
+    addUserImage(dataUrl);
+    if (question) addMsg(question, "me");
+    if (window.Mem && question) { try { window.Mem.capture(question); } catch (e) {} }
+    busy = true; setState("thinking");
+    var card = addMsg("…", "jv"); setAgent(card, "Analizando la imagen…");
+    API.analyzeImage(dataUrl, question || "").then(function (ans) {
+      busy = false; setState(""); setMsg(card, ans);
+      if (window.API && window.API.addExchange) API.addExchange((question || "[imagen]") + " (imagen adjunta)", ans);
+      speak(ans);
+    }).catch(function (e) {
+      busy = false; setState("");
+      var m = (e && e.message) || e;
+      if (/no soporta|not support|invalid model|model not|2013|1004|does not exist|unknown model|sin acceso|no access|vision|multimodal/i.test(String(m)))
+        m = "Tu plan de MiniMax no incluye el modelo con visión (M3), señor; por eso aún no puedo analizar imágenes. Lo dejo listo para cuando lo tengas.";
+      setMsg(card, "No pude analizar la imagen, señor: " + m);
     });
   }
   // Convierte un globo en una tarjeta de "agente trabajando" (reactor girando + texto + puntos).
@@ -580,6 +639,8 @@
     $("send").addEventListener("click", function () { Voice.unlock(); handle($("text").value); });
     $("text").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); handle($("text").value); } });
     $("mic").addEventListener("click", toggleMic);
+    $("attach").addEventListener("click", function () { Voice.unlock(); $("img-in").click(); });
+    $("img-in").addEventListener("change", onImagePicked);
     $("gear").addEventListener("click", openSettings);
     $("cfg-cancel").addEventListener("click", closeSettings);
     $("cfg-x").addEventListener("click", closeSettings);

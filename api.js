@@ -7,6 +7,8 @@
     get key()   { return localStorage.getItem("mm_key") || ""; },
     get base()  { return (localStorage.getItem("mm_base") || "https://api.minimax.io/anthropic").replace(/\/+$/, ""); },
     get model() { return localStorage.getItem("mm_model") || "MiniMax-M2"; },
+    // Modelo MULTIMODAL para analizar imágenes (M2 es solo texto). Configurable por si el plan usa otro id.
+    get visionModel() { return localStorage.getItem("mm_vision_model") || "MiniMax-M3"; },
     get clap()  { return localStorage.getItem("mm_clap") === "1"; },
     set clap(v) { localStorage.setItem("mm_clap", v ? "1" : "0"); },
     // Escucha continua «Jarvis» en Modo Super. APAGADA por defecto: en la PWA instalada de Android
@@ -508,6 +510,53 @@
     });
   }
 
+  // ── VISIÓN: analizar una imagen del usuario (MiniMax-M3 multimodal, formato OpenAI chat). ──
+  function visionMessages(dataUrl, question) {
+    return [{ role: "user", content: [{ type: "text", text: question }, { type: "image_url", image_url: { url: dataUrl } }] }];
+  }
+  function pickVisionText(d) {
+    var t = ""; try { t = d.choices[0].message.content; if (Array.isArray(t)) t = t.map(function (p) { return (p && p.text) || ""; }).join(" "); } catch (e) {}
+    return String(t || "");
+  }
+  function analyzeImageDirect(dataUrl, question) {
+    return fetch(mmHost() + "/v1/chat/completions", {
+      method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CFG.key },
+      body: JSON.stringify({ model: CFG.visionModel, messages: visionMessages(dataUrl, question) }),
+    }).then(function (r) { return r.json().catch(function () { return {}; }); }).then(function (d) {
+      var sc = d && d.base_resp && d.base_resp.status_code;
+      if (sc && sc !== 0) throw new Error("mm:" + (d.base_resp.status_msg || sc));
+      var t = pickVisionText(d); if (!t) throw new Error("sin-texto-directo"); return t;
+    });
+  }
+  function analyzeImageWorker(dataUrl, question) {
+    return fetch(workerBase() + "/vision", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: dataUrl, question: question, key: CFG.key, model: CFG.visionModel }),
+    }).then(function (r) { return r.text(); }).then(function (t) {
+      var d = null; try { d = JSON.parse(t); } catch (e) {}
+      if (!d) throw new Error("worker-no-vision");
+      if (d.error) throw new Error("mm:" + d.error);
+      return d.text || "";
+    });
+  }
+  function analyzeImage(dataUrl, question) {
+    if (!CFG.key) return Promise.reject(new Error("Falta la API key, señor."));
+    if (!dataUrl) return Promise.reject(new Error("Sin imagen."));
+    var q = question || "¿Qué hay en esta imagen? Descríbela en español de España, con detalle pero conciso.";
+    return analyzeImageDirect(dataUrl, q).catch(function (e) {
+      var m = (e && e.message) || ""; if (m.indexOf("mm:") === 0) throw e;   // error real de MiniMax → el Worker daría igual
+      return analyzeImageWorker(dataUrl, q);
+    }).then(function (txt) {
+      if (!txt || !txt.trim()) throw new Error("No he podido leer la imagen, señor.");
+      return txt.trim();
+    }).catch(function (err) {
+      var m = (err && err.message) || String(err);
+      if (m === "worker-no-vision") m = "El Worker aún no tiene la visión: vuelve a desplegar worker.js, señor.";
+      else if (m.indexOf("mm:") === 0) m = m.slice(3);
+      throw new Error(m);
+    });
+  }
+
   // ── MULTI-AGENTE DE CONTENIDO (buscar tendencias → idea → crear imagen/vídeo) ──
   // Una llamada suelta al cerebro (sin tocar el historial), p.ej. para sintetizar una idea.
   function askOnce(userContent, system) {
@@ -563,6 +612,7 @@
     asVideoPrompt: asVideoPrompt, generateVideo: generateVideo,
     asWebPrompt: asWebPrompt, generateWeb: generateWeb,
     asContentAgent: asContentAgent, ask: askOnce, search: function (q, cb) { return doSearch(q, cb); },
+    analyzeImage: analyzeImage,
     getHistory: function () { return H().slice(); },     // para mostrar el chat pasado
     clearHistory: function () { active().history.length = 0; saveStore(); },   // limpia SOLO la conversación activa
     // conversaciones

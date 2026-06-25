@@ -106,6 +106,31 @@ export default {
       }
     }
 
+    // ── VISIÓN: analizar una imagen que envía el usuario (MiniMax-M3 multimodal, formato OpenAI). ──
+    if (url.pathname === "/vision") {
+      let body = {};
+      try { body = await request.json(); } catch (e) {}
+      const mmKey = String((body && body.key) || "").trim();
+      const image = String((body && body.image) || "").trim();   // data URI (data:image/...;base64,) o URL https
+      const question = String((body && body.question) || "¿Qué hay en esta imagen? Descríbela en español.").slice(0, 1200);
+      const model = String((body && body.model) || "MiniMax-M3");
+      if (!mmKey) return jsonRes({ error: "Falta la API key." });
+      if (!image) return jsonRes({ error: "Falta la imagen." });
+      try {
+        const r = await fetch("https://api.minimax.io/v1/chat/completions", {
+          method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + mmKey },
+          body: JSON.stringify({ model: model, messages: [{ role: "user", content: [{ type: "text", text: question }, { type: "image_url", image_url: { url: image } }] }] }),
+        });
+        const d = await r.json();
+        if (d.base_resp && d.base_resp.status_code !== 0) return jsonRes({ error: d.base_resp.status_msg || ("MiniMax error " + r.status) });
+        let txt = "";
+        try { txt = d.choices[0].message.content; if (Array.isArray(txt)) txt = txt.map(function (p) { return (p && p.text) || ""; }).join(" "); } catch (e) {}
+        return jsonRes({ text: String(txt || "") });
+      } catch (e) {
+        return jsonRes({ error: "Visión: " + String((e && e.message) || e) });
+      }
+    }
+
     if (url.pathname !== "/tts" && url.pathname !== "/") {
       return new Response("JARVIS Worker. Usa /tts?text=... o /search?q=...", { status: 404, headers: CORS });
     }
