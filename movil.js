@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "4.8";
-  var WHATS_NEW = "Ya puedes descargar la app Android (APK) desde Ajustes → «App Android (APK)» y compartir el enlace. Y voz premium ElevenLabs opcional. (En la app Android: alarmas que hablan con la app cerrada.)";
+  var APP_VERSION = "4.9";
+  var WHATS_NEW = "En la app Android (APK) llegan los PODERES: leer notificaciones, mirar la pantalla («¿qué es esto?»), llamar, control por accesibilidad y micro en 2º plano (actívalos en Ajustes → Poderes del APK). En la web esto no aplica; descarga el APK en Ajustes.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -269,6 +269,40 @@
       addMsg(wrep, "jv"); speak(wrep);
       if (window.API && window.API.addExchange) API.addExchange(text, wrep);
       return;
+    }
+
+    // ── PODERES NATIVOS (solo en el APK JARVIS Max). En la web caen a MiniMax. ──
+    if (window.Native && window.Native.isNative()) {
+      // Leer notificaciones
+      if (/\bnotificacion(es)?\b/.test(nrm) && /\b(mis|que|lee|leer|leeme|revisa|revisame|mira|tengo|nuevas|ultimas)\b/.test(nrm)) {
+        busy = true; setState("thinking"); var ncard = addMsg("…", "jv"); setAgent(ncard, "Leyendo tus notificaciones…");
+        Native.readNotifications().then(function (list) {
+          busy = false; setState("");
+          if (!list.length) { setMsg(ncard, "No tienes notificaciones nuevas, señor."); speak("No tienes notificaciones nuevas, señor."); return; }
+          var lines = list.slice(0, 12).map(function (n) { return "• " + (n.title || n.packageName) + (n.text ? (": " + n.text) : ""); }).join("\n");
+          setMsg(ncard, "Tienes " + list.length + " notificaciones, señor:\n" + lines);
+          if (window.API && window.API.ask) API.ask("Resume en 1-2 frases, en español, estas notificaciones para Eric:\n" + lines, "Eres JARVIS, resume breve y útil.").then(function (s) { if (s) { addMsg(s, "jv"); speak(s); } }).catch(function(){});
+        }).catch(function () { busy = false; setState(""); setMsg(ncard, "Activa primero «Leer notificaciones» en Ajustes, señor (acceso a notificaciones de Android)."); });
+        return;
+      }
+      // Mirar la pantalla / «¿qué es esto?»
+      if (/\b(mira|ver|analiza|captura)\b.*\b(pantalla|esto|viendo|app)\b/.test(nrm) || /\bque (es|estoy viendo|sale|pone) (esto|aqui|en pantalla)\b/.test(nrm) || /\bque mod\b/.test(nrm)) {
+        busy = true; setState("thinking"); var scard = addMsg("…", "jv"); setAgent(scard, "Mirando tu pantalla…");
+        Native.captureScreen().then(function (dataUrl) {
+          if (!dataUrl) throw new Error("sin captura");
+          return API.analyzeImage(dataUrl, text).then(function (ans) {
+            busy = false; setState(""); setMsg(scard, ans); speak(ans);
+          });
+        }).catch(function (e) { busy = false; setState(""); setMsg(scard, "No pude ver la pantalla, señor: " + (e && e.message || e) + ". (Acepta el permiso de captura.)"); });
+        return;
+      }
+      // Llamar a un número
+      var mCall = nrm.match(/\b(llama|llamar|telefonea|marca)\b[^\d]*(\+?\d[\d\s]{5,}\d)/);
+      if (mCall) {
+        var num = mCall[2].replace(/\s/g, "");
+        Native.call(num).then(function () { addMsg("Llamando al " + num + ", señor.", "jv"); }).catch(function (e) { addMsg("No pude llamar, señor: " + (e && e.message || e), "jv"); });
+        return;
+      }
     }
 
     // 0z) ¿Pide LANZAR AGENTES / crear contenido a partir de TENDENCIAS? Cadena: buscar → idea → crear.
@@ -599,6 +633,7 @@
       $("cfg-el-on").classList.toggle("on", localStorage.getItem("el_on") === "1");
     } catch (e) {}
     var vl = $("ver-label"); if (vl) vl.textContent = "JARVIS móvil · v" + APP_VERSION;
+    var ap = $("apk-powers"); if (ap) ap.style.display = (window.Native && window.Native.isNative()) ? "block" : "none";
     $("modal").classList.add("show");
   }
   function closeSettings() { $("modal").classList.remove("show"); }
@@ -707,6 +742,14 @@
           .then(function () { addMsg("✓ Voz premium reproducida. Actívala con el interruptor para usarla siempre.", "sys"); })
           .catch(function (e) { addMsg("✗ Falló ElevenLabs: " + (e && e.message || e) + ". Revisa la key o el saldo (10.000 caracteres/mes en el plan gratis).", "sys"); });
       }
+    });
+    // Poderes del APK (solo si estamos en la app nativa)
+    if ($("cfg-notif")) $("cfg-notif").addEventListener("click", function () { if (window.Native) { Native.openNotifSettings(); addMsg("Activa «JARVIS» en Acceso a notificaciones, señor; luego dime «lee mis notificaciones».", "sys"); } });
+    if ($("cfg-access")) $("cfg-access").addEventListener("click", function () { if (window.Native) { Native.openAccessibility(); addMsg("Activa «JARVIS» en Accesibilidad, señor; luego podré mirar/controlar la pantalla.", "sys"); } });
+    if ($("cfg-mic-bg")) $("cfg-mic-bg").addEventListener("click", function () {
+      var on = !this.classList.contains("on"); this.classList.toggle("on", on);
+      if (window.Native) { if (on) Native.startMic(); else Native.stopMic(); }
+      addMsg(on ? "Escucha en 2º plano activada, señor." : "Escucha en 2º plano desactivada.", "sys");
     });
     $("cfg-sfx").addEventListener("click", function () {
       if (!window.sfx) return;
