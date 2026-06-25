@@ -12,8 +12,12 @@
     P.Screen = P.Screen || reg("JarvisScreen");
     P.Access = P.Access || reg("JarvisAccessibility");
     P.Call   = P.Call   || reg("JarvisCall");
+    P.Open   = P.Open   || reg("JarvisOpen");
     return P;
   }
+  // ── Abrir apps/URLs de forma NATIVA (en el WebView window.location.href no abre apps) ──
+  function openExternal(url, fallbackUrl) { var p = plugins(); if (!p.Open) return Promise.reject(new Error("no-native")); return p.Open.openExternal({ url: url, fallbackUrl: fallbackUrl || "" }); }
+  function openPackage(pkg, fallbackUrl) { var p = plugins(); if (!p.Open) return Promise.reject(new Error("no-native")); return p.Open.open({ package: pkg, fallbackUrl: fallbackUrl || "" }); }
   // ── B4: notificaciones ──
   function readNotifications() {
     var p = plugins(); if (!p.Notifs) return Promise.reject(new Error("no-native"));
@@ -36,6 +40,7 @@
 
   window.Native = {
     isNative: isNative, plugins: plugins,
+    openExternal: openExternal, openPackage: openPackage,
     readNotifications: readNotifications, openNotifSettings: openNotifSettings,
     captureScreen: captureScreen, startMic: startMic, stopMic: stopMic,
     openAccessibility: openAccessibility, readScreen: readScreen, setText: setText, clickByText: clickByText, call: call,

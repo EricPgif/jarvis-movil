@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "4.9";
-  var WHATS_NEW = "En la app Android (APK) llegan los PODERES: leer notificaciones, mirar la pantalla («¿qué es esto?»), llamar, control por accesibilidad y micro en 2º plano (actívalos en Ajustes → Poderes del APK). En la web esto no aplica; descarga el APK en Ajustes.";
+  var APP_VERSION = "5.0";
+  var WHATS_NEW = "APK arreglado a fondo: ahora la VOZ funciona (reconocimiento nativo de Android), las apps se ABREN de verdad (WhatsApp/YouTube/Telegram…) y se quitó el Service Worker que rompía la app dentro del APK. Reinstala el APK desde Ajustes para tenerlo.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -779,6 +779,13 @@
   // ── Auto-actualización (sin reinstalar) ──
   var _swReg = null;
   function setupAutoUpdate() {
+    // En el APK (Capacitor) el Service Worker SOBRA y puede ROMPER el bridge nativo (plugins no
+    // cargan → "permisos a todo pero no va"). Lo desregistramos y NO lo activamos.
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+      try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { try { r.unregister(); } catch (e) {} }); }); } catch (e) {}
+      try { if (window.caches) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (e) {} }); }); } catch (e) {}
+      return;
+    }
     if (!("serviceWorker" in navigator)) return;
     var hadController = !!navigator.serviceWorker.controller;
     var refreshing = false;

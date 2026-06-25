@@ -94,7 +94,12 @@
   // ── STT ──
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   var rec = null, listening = false;
-  var sttSupported = !!SR;
+  // En el APK (WebView) el Web Speech API NO existe → usamos el plugin NATIVO de Android.
+  function nativeStt() {
+    try { if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition) return window.Capacitor.Plugins.SpeechRecognition; } catch (e) {}
+    return null;
+  }
+  var sttSupported = !!SR || (function () { try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; } })();
   if (SR) {
     rec = new SR();
     rec.lang = "es-ES"; rec.interimResults = false; rec.maxAlternatives = 1;
@@ -115,8 +120,36 @@
     };
   }
 
+  // Escucha por el plugin NATIVO de Android (APK). Una frase → texto.
+  function nativeListen(onResult, onState, onError) {
+    var SP = nativeStt();
+    if (!SP) { if (onError) onError("no-stt"); return { ok: false }; }
+    if (listening) { try { SP.stop(); } catch (e) {} listening = false; if (onState) onState(false); return { ok: true, stopped: true }; }
+    cancel();
+    try { if (window.Clap) window.Clap.pause(); } catch (e) {}
+    SP.checkPermissions().then(function (p) {
+      if (p && p.speechRecognition === "granted") return p;
+      return SP.requestPermissions();
+    }).then(function (p) {
+      if (!p || p.speechRecognition !== "granted") { if (onError) onError("not-allowed"); try { if (window.Clap) window.Clap.resume(); } catch (e) {} return; }
+      listening = true; if (onState) onState(true);
+      return SP.start({ language: "es-ES", maxResults: 2, partialResults: false, popup: false }).then(function (r) {
+        listening = false; if (onState) onState(false);
+        try { if (window.Clap) window.Clap.resume(); } catch (e) {}
+        var t = r && r.matches && r.matches[0];
+        if (t && _onResult) _onResult(t); else if (onError) onError("no-speech");
+      });
+    }).catch(function (e) {
+      listening = false; if (onState) onState(false);
+      try { if (window.Clap) window.Clap.resume(); } catch (e) {}
+      if (onError) onError((e && (e.message || e)) || "error");
+    });
+    return { ok: true, started: true };
+  }
+
   function toggleListen(onResult, onState, onError) {
     _onResult = onResult; _onState = onState; _onError = onError;
+    if (nativeStt()) return nativeListen(onResult, onState, onError);   // APK → voz nativa
     if (!rec) return { ok: false, reason: "no-stt" };
     if (listening) { try { rec.stop(); } catch (e) {} return { ok: true, stopped: true }; }
     cancel();

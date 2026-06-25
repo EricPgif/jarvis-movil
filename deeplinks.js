@@ -100,6 +100,13 @@
   function openDirect(d) {
     if (!d) return;
     var web = d.web || d.https || (/^https?:/i.test(d.url || "") ? d.url : "");
+    // APK (WebView): abrir de forma NATIVA (window.location.href no lanza apps en el WebView).
+    if (window.Native && window.Native.isNative()) {
+      if (d.android) { window.Native.openPackage(d.android, web).catch(function () { if (d.scheme) window.Native.openExternal(d.scheme, web); else if (web) window.Native.openExternal(web); }); return; }
+      if (d.scheme) { window.Native.openExternal(d.scheme, web); return; }
+      if (web) { window.Native.openExternal(web); return; }
+      return;
+    }
     if (isAndroid()) {
       // ANDROID: lo fiable es el intent:// con package + URL https oficial (App Links → abre la APP;
       // si no está, web; nunca Play Store). Los esquemas 'bare' (whatsapp://, tg://) NO abren en MIUI.
@@ -134,12 +141,11 @@
   // Abre WhatsApp con un mensaje YA escrito (el usuario pulsa enviar; el auto-envío es nativo/APK).
   function sendWhatsApp(text, number) {
     var t = encodeURIComponent(text || "");
-    if (number) {
-      var num = String(number).replace(/[^\d]/g, "");
-      open("whatsapp://send?phone=" + num + "&text=" + t, isAndroid() ? null : ("https://wa.me/" + num + "?text=" + t));
-    } else {
-      open("whatsapp://send?text=" + t, isAndroid() ? null : ("https://wa.me/?text=" + t));
-    }
+    var num = number ? String(number).replace(/[^\d]/g, "") : "";
+    var waUrl = num ? ("https://wa.me/" + num + "?text=" + t) : ("https://wa.me/?text=" + t);
+    if (window.Native && window.Native.isNative()) { window.Native.openExternal(waUrl).catch(function () {}); return; }
+    if (num) open("whatsapp://send?phone=" + num + "&text=" + t, isAndroid() ? null : waUrl);
+    else open("whatsapp://send?text=" + t, isAndroid() ? null : waUrl);
   }
   function searchMusic(q) {
     q = (q || "").trim();
