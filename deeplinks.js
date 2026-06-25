@@ -125,6 +125,16 @@
     else open(n.scheme, n.https);
     return n.frase;
   }
+  // Abre WhatsApp con un mensaje YA escrito (el usuario pulsa enviar; el auto-envío es nativo/APK).
+  function sendWhatsApp(text, number) {
+    var t = encodeURIComponent(text || "");
+    if (number) {
+      var num = String(number).replace(/[^\d]/g, "");
+      open("whatsapp://send?phone=" + num + "&text=" + t, isAndroid() ? null : ("https://wa.me/" + num + "?text=" + t));
+    } else {
+      open("whatsapp://send?text=" + t, isAndroid() ? null : ("https://wa.me/?text=" + t));
+    }
+  }
   function searchMusic(q) {
     q = (q || "").trim();
     if (!q) return openApp("spotify");
@@ -136,5 +146,5 @@
   }
 
   window.Links = { open: open, openApp: openApp, openDirect: openDirect, openNamed: openNamed, searchMusic: searchMusic,
-                   reopenLast: reopenLast, isAndroid: isAndroid, isPcOnly: isPcOnly, APPS: APPS, NAMED: NAMED, CLAP: NAMED.clap };
+                   sendWhatsApp: sendWhatsApp, reopenLast: reopenLast, isAndroid: isAndroid, isPcOnly: isPcOnly, APPS: APPS, NAMED: NAMED, CLAP: NAMED.clap };
 })();

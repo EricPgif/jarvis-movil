@@ -44,9 +44,12 @@
     STORE.active = STORE.convos[0].id; return STORE.convos[0];
   }
   function H() { return active().history; }          // historial de la conversación ACTIVA
-  function saveHist() {                              // recorta a 30 EN SITIO (mantiene referencia) + guarda
+  // Mantiene MUCHOS mensajes para VERLOS (no se "para en 15"); a MiniMax solo se le envían los
+  // últimos ~24 (CTX_MAX) por coste/contexto. Recorta a 200 EN SITIO (mantiene la referencia).
+  var DISPLAY_MAX = 200, CTX_MAX = 24;
+  function saveHist() {
     var c = active();
-    if (c.history.length > 30) c.history.splice(0, c.history.length - 30);
+    if (c.history.length > DISPLAY_MAX) c.history.splice(0, c.history.length - DISPLAY_MAX);
     saveStore();
   }
 
@@ -121,7 +124,7 @@
   function needsWeb(t) {
     // Normaliza (sin acentos) → el \b de regex es ASCII y "pasó"/"falleció" rompían el match.
     t = " " + (t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") + " ";
-    return /\b(noticias?|hoy|ayer|manana|reciente|recientemente|ultim[oa]s?|ultima hora|en directo|en vivo|ahora mismo|este ano|2024|2025|2026|falleci|ha muerto|murio|que le paso|que paso|que ha pasado|resultados?|marcador|partidos?|mundial|liga|champions|clasico|gol(es)?|gano|ganador|juega|jugo|clima|tiempo|temperatura|llover|lluvia|grados|pronostico|precio|cuanto cuesta|cotiza|bolsa|estreno|cartelera|cuando sale|cuando es|cuando empieza|horario|ultima version|version nueva|nuevo modelo)\b/.test(t)
+    return /\b(noticias?|hoy|ayer|manana|reciente|recientemente|ultim[oa]s?|ultima hora|en directo|en vivo|ahora mismo|este ano|2024|2025|2026|falleci|ha muerto|murio|que le paso|que paso|que ha pasado|resultados?|marcador|partidos?|mundial|liga|champions|clasico|gol(es)?|gano|ganador|juega|jugo|clima|tiempo|temperatura|llover|lluvia|grados|pronostico|precio|cuanto cuesta|cotiza|bolsa|estreno|estrenos|cartelera|peliculas?|series?|cuando sale|salido|sacado|sacan|cuando es|cuando empieza|horario|ultima version|version nueva|nuevo modelo|populares?|mas vist[oa]s?|mejores|top|ranking|tendencia|tendencias|recomienda(me)?|que ver)\b/.test(t)
         || /\b(busca|buscame|googlea|en internet|en la web|que se sabe de|informacion (de|sobre|actual))\b/.test(t);
   }
   // ¿La respuesta es un "no puedo / no tengo acceso"? → buscaremos y reintentaremos.
@@ -219,7 +222,7 @@
     if (!CFG.key) return Promise.reject(new Error("sin key"));
     H().push({ role: "user", content: userText });
     saveHist();
-    var messages = H().slice();   // copia de trabajo (crece con bloques de herramienta)
+    var messages = H().slice(-CTX_MAX);   // a MiniMax solo las últimas ~24 (coste); el resto se ve igual
     var didSearch = false;
     function injectSearch(info) {
       var i = messages.length - 1;
@@ -254,7 +257,7 @@
             return loop(depth + 1);
           });
         }
-        return cleanText(blocks) || "A su servicio, señor.";
+        return cleanText(blocks);   // puede ser "" → lo maneja la red de "respuesta vacía"
       });
     }
     // 1) Pre-búsqueda si la pregunta es claramente de info reciente.
@@ -262,7 +265,7 @@
     return pre.then(function () { return loop(0); })
       .then(function (txt) {
         // 2) Red de seguridad: si NO buscó y la respuesta es un "no puedo / no tengo acceso" → busca y reintenta.
-        if (!didSearch && isRefusal(txt)) {
+        if (!didSearch && txt && isRefusal(txt)) {
           return doSearch(userText, onStatus).then(function (info) {
             if (!info) return txt;
             didSearch = true;
@@ -272,6 +275,13 @@
           });
         }
         return txt;
+      })
+      .then(function (txt) {
+        // 3) Red de "respuesta VACÍA": MiniMax-M2 a veces devuelve solo herramientas/markup → texto vacío
+        //    (era el "A su servicio, señor" sin sentido). Reintenta UNA vez pidiendo texto natural.
+        if (txt && txt.trim()) return txt;
+        messages.push({ role: "user", content: "Responde AHORA en español de España, con texto natural, claro y útil, contestando a mi última pregunta. NO uses herramientas, tool_call, invoke ni XML; solo texto." });
+        return loop(0).then(function (t2) { return (t2 && t2.trim()) ? t2 : "Disculpe, señor, no me ha salido la respuesta. ¿Puede repetírmelo?"; });
       })
       .then(function (finalTxt) {
         H().push({ role: "assistant", content: finalTxt });
@@ -376,6 +386,151 @@
       });
   }
 
+  // ── GENERACIÓN DE VÍDEO (MiniMax Hailuo, ASÍNCRONO: submit → poll → retrieve). Directo→Worker. ──
+  function asVideoPrompt(text) {
+    var raw = (text || "").trim(); if (!raw) return null;
+    var n = " " + raw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") + " ";
+    if (!/\bvideos?\b|\bvideoclip\b|\bclip\b|\breel\b/.test(n)) return null;
+    if (!/\b(haz|hazme|haces|hacer|hacerme|crea|creame|genera|generame|gener|monta|montame|quiero|necesito|ponme|dame|generar|crear|grabame|grabar)\b/.test(n)) return null;
+    var p = raw.trim()
+      .replace(/^[¿¡\s]+/, "")
+      .replace(/^(?:oye|venga|por favor|porfa|jarvis)[\s,]+/i, "")
+      .replace(/^(?:me\s+)?(?:puedes?\s+|podrias?\s+)?(?:haz(?:me|le)?|haces|hacer(?:me)?|cr[eé][ae](?:me)?|gener[ae](?:me)?|g[eé]ner[ae]me|mont[ae](?:me)?|grab[ae](?:me)?|quiero|necesito|ponme|dame|generar|crear)\s+/i, "")
+      .replace(/^(?:un|una|el|la)\s+(?:video|videoclip|clip|reel)\s+(?:de\s+|sobre\s+|que\s+)?/i, "")
+      .replace(/^[\s:,.\-]+/, "").trim();
+    if (p.length < 2) p = raw;
+    return p.slice(0, 1800);
+  }
+  function mmGet(path) {   // GET directo a MiniMax (con la key)
+    return fetch(mmHost() + path, { headers: { "Authorization": "Bearer " + CFG.key } }).then(function (r) { return r.json(); });
+  }
+  function vidSubmitDirect(prompt) {
+    return fetch(mmHost() + "/v1/video_generation", {
+      method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CFG.key },
+      body: JSON.stringify({ model: "MiniMax-Hailuo-02", prompt: prompt }),
+    }).then(function (r) { return r.json().catch(function () { return {}; }); }).then(function (d) {
+      var sc = d && d.base_resp && d.base_resp.status_code;
+      if (sc && sc !== 0) throw new Error("mm:" + (d.base_resp.status_msg || sc));
+      if (!d.task_id) throw new Error("sin-task");
+      return d.task_id;
+    });
+  }
+  function vidSubmitWorker(prompt) {
+    return fetch(workerBase() + "/video", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: prompt, key: CFG.key }),
+    }).then(function (r) { return r.text(); }).then(function (t) {
+      var d = null; try { d = JSON.parse(t); } catch (e) {}
+      if (!d) throw new Error("worker-no-video");
+      if (d.error) throw new Error("mm:" + d.error);
+      if (!d.task_id) throw new Error("sin-task");
+      return d.task_id;
+    });
+  }
+  function generateVideo(prompt, onStatus) {
+    if (!CFG.key) return Promise.reject(new Error("Falta la API key, señor."));
+    if (!prompt) return Promise.reject(new Error("Sin descripción para el vídeo."));
+    var useWorker = false;
+    function st(m) { if (onStatus) { try { onStatus(m); } catch (e) {} } }
+    function status(taskId) {
+      if (useWorker) return fetch(workerBase() + "/video-status", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ task_id: taskId, key: CFG.key }) }).then(function (r) { return r.json(); });
+      return mmGet("/v1/query/video_generation?task_id=" + encodeURIComponent(taskId));
+    }
+    function fileUrl(fileId) {
+      if (useWorker) return fetch(workerBase() + "/video-file", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file_id: fileId, key: CFG.key }) }).then(function (r) { return r.json(); }).then(function (d) { return d.url || d.download_url || ""; });
+      return mmGet("/v1/files/retrieve?file_id=" + encodeURIComponent(fileId)).then(function (d) { var f = (d && d.file) || {}; return f.download_url || f.backup_download_url || ""; });
+    }
+    st("Encargando tu vídeo a MiniMax…");
+    return vidSubmitDirect(prompt).catch(function (e) {
+      var m = (e && e.message) || ""; if (m.indexOf("mm:") === 0) throw e;   // error real → no insistir
+      useWorker = true; return vidSubmitWorker(prompt);
+    }).then(function (taskId) {
+      var tries = 0, max = 80;   // ~80 × 8s ≈ 10-11 min
+      return new Promise(function (resolve, reject) {
+        function tick() {
+          tries++;
+          status(taskId).then(function (d) {
+            var s = (d && (d.status || d.Status)) || "";
+            var fid = (d && (d.file_id || d.fileId)) || "";
+            if (/success/i.test(s) && fid) { st("Descargando tu vídeo…"); fileUrl(fid).then(function (u) { u ? resolve(u) : reject(new Error("Sin URL de vídeo, señor.")); }).catch(reject); return; }
+            if (/fail/i.test(s)) { reject(new Error("MiniMax no pudo crear el vídeo, señor.")); return; }
+            if (tries >= max) { reject(new Error("El vídeo tardó demasiado, señor.")); return; }
+            st("Generando tu vídeo… (" + (s || "en cola") + " · " + (tries * 8) + "s)");
+            setTimeout(tick, 8000);
+          }).catch(function (e) { if (tries >= max) { reject(e); return; } setTimeout(tick, 8000); });
+        }
+        setTimeout(tick, 6000);
+      });
+    });
+  }
+
+  // ── GENERACIÓN DE WEBS / HTML (usa el CHAT /v1/messages, que ya va por CORS; NO necesita Worker) ──
+  function asWebPrompt(text) {
+    var raw = (text || "").trim(); if (!raw) return null;
+    var n = " " + raw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") + " ";
+    if (!/\b(web|pagina|paginas|landing|sitio web|html|portfolio|portafolio|pagina web)\b/.test(n)) return null;
+    if (!/\b(haz|hazme|haces|hacer|hacerme|crea|creame|genera|generame|gener|monta|montame|disena|disename|programa|programame|construye|construyeme|quiero|necesito|dame|crear|generar|disenar|programar|construir)\b/.test(n)) return null;
+    return raw.slice(0, 1000);
+  }
+  function extractHtml(txt) {
+    if (!txt) return "";
+    var m = txt.match(/```(?:html)?\s*([\s\S]*?)```/i);
+    var code = (m ? m[1] : txt).trim();
+    if (!/<html[\s>]/i.test(code) && /<(?:!doctype|div|section|body|h1|main|header|nav)/i.test(code)) {
+      code = '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>' + code + '</body></html>';
+    }
+    return /<[a-z!]/i.test(code) ? code : "";
+  }
+  function generateWeb(description) {
+    if (!CFG.key) return Promise.reject(new Error("Falta la API key, señor."));
+    var sys = "Eres un desarrollador web experto. Devuelve EXCLUSIVAMENTE el codigo de UN UNICO archivo HTML completo, " +
+      "autocontenido y funcional: TODO el CSS dentro de <style> y TODO el JS dentro de <script>, en el mismo archivo, " +
+      "SIN dependencias externas (salvo imagenes de https://picsum.photos si hacen falta). Diseno moderno, bonito y responsive. " +
+      "Texto en espanol. NO des explicaciones; envuelve el codigo en un bloque ```html ... ```.";
+    var msgs = [{ role: "user", content: "Crea esto como una pagina web (un solo archivo HTML autocontenido y terminado): " + description }];
+    var ctrl, to, timedOut = false;
+    try { ctrl = new AbortController(); to = setTimeout(function () { timedOut = true; ctrl.abort(); }, 75000); } catch (e) {}
+    return fetch(CFG.base + "/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CFG.key },
+      body: JSON.stringify({ model: CFG.model, max_tokens: 8000, temperature: 0.6, system: sys, thinking: { type: "disabled" }, messages: msgs }),
+      signal: ctrl && ctrl.signal,
+    }).then(function (r) { if (to) clearTimeout(to); return r.json(); }).then(function (data) {
+      if (data.error) throw new Error((data.error.message || data.error));
+      var txt = (data.content || []).filter(function (b) { return b && b.type === "text"; }).map(function (b) { return b.text || ""; }).join("");
+      var html = extractHtml(txt);
+      if (!html) throw new Error("No me salió el HTML, señor. Inténtelo otra vez.");
+      return html;
+    }).catch(function (err) {
+      if (to) clearTimeout(to);
+      if (timedOut || (err && err.name === "AbortError")) throw new Error("La web tardó demasiado, señor. Inténtelo otra vez.");
+      throw err;
+    });
+  }
+
+  // ── MULTI-AGENTE DE CONTENIDO (buscar tendencias → idea → crear imagen/vídeo) ──
+  // Una llamada suelta al cerebro (sin tocar el historial), p.ej. para sintetizar una idea.
+  function askOnce(userContent, system) {
+    if (!CFG.key) return Promise.reject(new Error("sin key"));
+    return fetch(CFG.base + "/v1/messages", {
+      method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CFG.key },
+      body: JSON.stringify({ model: CFG.model, max_tokens: 600, temperature: 0.7, system: system || buildSystem(), thinking: { type: "disabled" }, messages: [{ role: "user", content: userContent }] }),
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.error) throw new Error(d.error.message || d.error);
+      return cleanText(d.content || []);
+    });
+  }
+  // ¿Pide lanzar agentes / crear contenido a partir de TENDENCIAS? Devuelve {kind:'video'|'imagen'} o null.
+  function asContentAgent(text) {
+    var n = " " + (text || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") + " ";
+    var wantsCreate = /\b(haz|hazme|crea|creame|genera|generame|monta|montame|sube|subir|publica|publicar)\b/.test(n);
+    var media = (/\bvideos?\b|\breel\b|\bclip\b/.test(n)) ? "video" : ((/\bimagen|imagenes|foto|fotos|post\b/.test(n)) ? "imagen" : "");
+    var trends = /\btendencia|tendencias|en tendencia|viral|virales|de moda|trending|lo que se lleva|redes sociales\b/.test(n);
+    var agents = /\bagentes?\b/.test(n);
+    if ((agents || trends) && (wantsCreate || media)) return { kind: media || "video" };
+    return null;
+  }
+
   // ── API de conversaciones ──
   function listConvos() {
     return STORE.convos.map(function (c) {
@@ -405,6 +560,9 @@
   window.API = {
     askMiniMax: askMiniMax, SYSTEM: SYSTEM, addExchange: addExchange,
     asImagePrompt: asImagePrompt, imageAspect: imageAspect, generateImage: generateImage,
+    asVideoPrompt: asVideoPrompt, generateVideo: generateVideo,
+    asWebPrompt: asWebPrompt, generateWeb: generateWeb,
+    asContentAgent: asContentAgent, ask: askOnce, search: function (q, cb) { return doSearch(q, cb); },
     getHistory: function () { return H().slice(); },     // para mostrar el chat pasado
     clearHistory: function () { active().history.length = 0; saveStore(); },   // limpia SOLO la conversación activa
     // conversaciones

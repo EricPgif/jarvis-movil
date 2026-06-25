@@ -33,13 +33,14 @@
       run: function (t, m) { return window.Links.searchMusic(m[1]); } },
     { re: /\bbuenos dias\b/,   run: function () { return window.Links.searchMusic("música clásica"); } },
 
-    // Abrir apps por nombre
-    { re: /\b(abre|abrir|lanza|ejecuta|pon)\b/,
+    // Abrir apps por nombre. OJO: "lanza"/"ejecuta" quitados (que "lanza 2 agentes" NO abra una app)
+    // y "videos?" quitado (que "hazme un vídeo" NO abra YouTube). La creación se intercepta antes.
+    { re: /\b(abre|abrir|abreme|ponme)\b/,
       run: function (t) {
         var keys = Object.keys(window.Links.APPS);
         for (var i = 0; i < keys.length; i++) { if (t.indexOf(keys[i]) !== -1) return window.Links.openApp(keys[i]); }
         if (/\bmusica\b|\bspotify\b/.test(t)) return window.Links.openApp("spotify");
-        if (/\byoutube\b|\bvideos?\b/.test(t)) return window.Links.openApp("youtube");
+        if (/\byoutube\b/.test(t)) return window.Links.openApp("youtube");
         return null;   // "abre <algo>" desconocido → cae a MiniMax / PC-only
       } },
   ];

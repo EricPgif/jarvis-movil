@@ -67,6 +67,45 @@ export default {
       }
     }
 
+    // ── VÍDEO (MiniMax Hailuo, asíncrono). 3 rutas: encargar / consultar / obtener archivo. ──
+    if (url.pathname === "/video" || url.pathname === "/video-status" || url.pathname === "/video-file") {
+      let body = {};
+      try { body = await request.json(); } catch (e) {}
+      const mmKey = String((body && body.key) || "").trim();
+      if (!mmKey) return jsonRes({ error: "Falta la API key." });
+      const auth = { "Authorization": "Bearer " + mmKey };
+      try {
+        if (url.pathname === "/video") {
+          const prompt = String((body && body.prompt) || "").trim().slice(0, 1800);
+          if (!prompt) return jsonRes({ error: "Falta la descripción del vídeo." });
+          const model = String((body && body.model) || "MiniMax-Hailuo-02");
+          const r = await fetch("https://api.minimax.io/v1/video_generation", {
+            method: "POST", headers: Object.assign({ "Content-Type": "application/json" }, auth),
+            body: JSON.stringify({ model, prompt }),
+          });
+          const d = await r.json();
+          if (d.base_resp && d.base_resp.status_code !== 0) return jsonRes({ error: d.base_resp.status_msg || "MiniMax error" });
+          return jsonRes({ task_id: d.task_id || "" });
+        }
+        if (url.pathname === "/video-status") {
+          const taskId = String((body && body.task_id) || "").trim();
+          if (!taskId) return jsonRes({ error: "Falta task_id." });
+          const r = await fetch("https://api.minimax.io/v1/query/video_generation?task_id=" + encodeURIComponent(taskId), { headers: auth });
+          const d = await r.json();
+          return jsonRes({ status: d.status || "", file_id: d.file_id || "" });
+        }
+        // /video-file
+        const fileId = String((body && body.file_id) || "").trim();
+        if (!fileId) return jsonRes({ error: "Falta file_id." });
+        const r = await fetch("https://api.minimax.io/v1/files/retrieve?file_id=" + encodeURIComponent(fileId), { headers: auth });
+        const d = await r.json();
+        const f = (d && d.file) || {};
+        return jsonRes({ url: f.download_url || f.backup_download_url || "" });
+      } catch (e) {
+        return jsonRes({ error: "Vídeo: " + String((e && e.message) || e) });
+      }
+    }
+
     if (url.pathname !== "/tts" && url.pathname !== "/") {
       return new Response("JARVIS Worker. Usa /tts?text=... o /search?q=...", { status: 404, headers: CORS });
     }

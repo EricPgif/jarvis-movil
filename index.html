@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="manifest" href="manifest.json?v=34" />
+<link rel="manifest" href="manifest.json?v=35" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 <style>
   :root{
@@ -75,6 +75,15 @@
   .me{align-self:flex-end; background:var(--cyan-soft); border:1px solid var(--border-hi); color:var(--text);}
   .jv{align-self:flex-start; background:var(--card); border:1px solid var(--border); color:var(--text);}
   .sys{align-self:center; color:var(--text-muted); font-size:12px; text-align:center;}
+  /* Permitir SELECCIONAR y copiar el texto del chat (el resto de la app sigue sin selección). */
+  .log, .log .msg, #super-log, #super-log .msg{ -webkit-user-select:text; user-select:text; }
+  .msg{position:relative;}
+  /* Markdown ligero en respuestas de JARVIS */
+  .msg b{color:#eafaff;} .msg code{background:rgba(0,212,255,.12); padding:1px 5px; border-radius:5px; font-size:13px;}
+  .msg pre{background:#06101c; border:1px solid var(--border); border-radius:8px; padding:8px 10px; overflow-x:auto; font-size:12.5px; white-space:pre-wrap;}
+  /* Botón copiar por mensaje */
+  .copy-btn{float:right; margin:-2px -4px 4px 10px; opacity:.4; background:transparent; border:0; color:var(--cyan); font-size:14px; line-height:1; padding:2px; cursor:pointer; -webkit-user-select:none; user-select:none;}
+  .copy-btn:active{opacity:1;}
   /* ── Agente trabajando (estilo reactor JARVIS): anillo girando + núcleo latiendo + puntos ── */
   .msg.agent{display:flex; align-items:center; gap:11px; background:rgba(0,212,255,.07); border-color:var(--border-hi); box-shadow:0 0 16px rgba(0,212,255,.12);}
   .agent-orb{position:relative; width:20px; height:20px; flex:0 0 auto;}
@@ -87,9 +96,22 @@
   @keyframes agdots{0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."}}
   /* ── Imagen generada (MiniMax image-01) ── */
   .msg.img{padding:6px; background:var(--card); border:1px solid var(--border-hi); display:flex; flex-direction:column; gap:6px;}
-  .msg.img img.genimg{display:block; width:100%; max-width:260px; border-radius:10px; background:#0c1826; box-shadow:0 0 18px rgba(0,212,255,.14);}
-  .msg.img .img-dl{font-size:12px; color:var(--cyan); text-decoration:none; letter-spacing:.3px;}
+  .msg.img img.genimg{display:block; width:100%; max-width:260px; border-radius:10px; background:#0c1826; box-shadow:0 0 18px rgba(0,212,255,.14); cursor:zoom-in;}
+  .msg.img video.genvid{display:block; width:100%; max-width:280px; border-radius:10px; background:#0c1826; box-shadow:0 0 18px rgba(0,212,255,.14);}
+  /* Web/HTML generada */
+  .msg.web{padding:6px; background:var(--card); border:1px solid var(--border-hi); display:flex; flex-direction:column; gap:8px; max-width:300px;}
+  .msg.web iframe.genweb{width:100%; height:210px; border:1px solid var(--border); border-radius:10px; background:#fff;}
+  .msg.web .web-actions{display:flex; gap:14px;}
+  .msg.web .img-dl{font-size:12.5px;}
+  .msg.img .img-dl{font-size:12px; color:var(--cyan); letter-spacing:.3px; background:transparent; border:0; text-align:left; padding:0; cursor:pointer;}
   .msg.img .img-dl:active{opacity:.7;}
+  /* Lightbox: ver la imagen grande (la YA cargada, sin navegar a la URL firmada) + zoom por toque */
+  #img-lightbox{position:fixed; inset:0; background:rgba(0,0,0,.93); z-index:80; display:none; align-items:center; justify-content:center; overflow:auto;}
+  #img-lightbox.show{display:flex;}
+  #img-lightbox img{max-width:100%; max-height:100%; border-radius:6px; transition:transform .15s ease; cursor:zoom-in;}
+  #img-lightbox img.zoom{max-width:none; max-height:none; width:230%; cursor:zoom-out;}
+  #img-lightbox .lb-x{position:fixed; top:calc(10px + env(safe-area-inset-top)); right:14px; width:42px; height:42px; border-radius:50%; border:1px solid var(--border-hi); background:rgba(10,23,38,.85); color:var(--cyan); font-size:18px; z-index:81;}
+  #img-lightbox .lb-dl{position:fixed; bottom:calc(16px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); padding:11px 20px; border-radius:22px; border:1px solid var(--border-hi); background:rgba(10,23,38,.9); color:var(--cyan); font-size:13px; font-weight:600; z-index:81;}
 
   /* ── Barra de entrada ── */
   .bar{display:flex; gap:8px; padding:10px 12px; flex:0 0 auto; padding-bottom:calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); background:rgba(7,17,29,.6);}
@@ -308,22 +330,22 @@
     </div>
   </div>
 
-  <script src="sfx.js?v=34"></script>
-  <script src="sphere.js?v=34"></script>
-  <script src="appicons.js?v=34"></script>
-  <script src="memory.js?v=34"></script>
-  <script src="api.js?v=34"></script>
-  <script src="edgetts.js?v=34"></script>
-  <script src="pcvoice.js?v=34"></script>
-  <script src="voice.js?v=34"></script>
-  <script src="deeplinks.js?v=34"></script>
-  <script src="weather.js?v=34"></script>
-  <script src="router.js?v=34"></script>
-  <script src="super.js?v=34"></script>
-  <script src="intro.js?v=34"></script>
-  <script src="clap.js?v=34"></script>
-  <script src="standby.js?v=34"></script>
-  <script src="extras.js?v=34"></script>
-  <script src="movil.js?v=34"></script>
+  <script src="sfx.js?v=35"></script>
+  <script src="sphere.js?v=35"></script>
+  <script src="appicons.js?v=35"></script>
+  <script src="memory.js?v=35"></script>
+  <script src="api.js?v=35"></script>
+  <script src="edgetts.js?v=35"></script>
+  <script src="pcvoice.js?v=35"></script>
+  <script src="voice.js?v=35"></script>
+  <script src="deeplinks.js?v=35"></script>
+  <script src="weather.js?v=35"></script>
+  <script src="router.js?v=35"></script>
+  <script src="super.js?v=35"></script>
+  <script src="intro.js?v=35"></script>
+  <script src="clap.js?v=35"></script>
+  <script src="standby.js?v=35"></script>
+  <script src="extras.js?v=35"></script>
+  <script src="movil.js?v=35"></script>
 </body>
 </html>

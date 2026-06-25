@@ -7,15 +7,44 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "4.4";
-  var WHATS_NEW = "Imágenes: «hazme una imagen de un gato» (ahora intenta sin el Worker). Modo Super sin el «tic» del micro: la escucha continua «Jarvis» está apagada por defecto (tócale la esfera; puedes activarla en Ajustes). Y las apps abren la APP directa, ya no la Play Store.";
+  var APP_VERSION = "4.5";
+  var WHATS_NEW = "¡Mogollón nuevo! Ya hago VÍDEOS («hazme un vídeo de…», tarda minutos) y WEBS («hazme una web de…»). Las imágenes se ven en GRANDE con zoom al tocarlas (y se descargan). Multi-agente: «busca tendencias y hazme un vídeo». Puedes COPIAR el texto del chat (mantén pulsado o el botón ⧉), el chat es más visual, y pongo ALARMAS que te hablo a la hora. Arreglado: ya no abre YouTube ni se queda en «A su servicio».";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
+  // Markdown LIGERO (negritas, código, listas, saltos). Escapa HTML primero (seguro).
+  function renderRich(text) {
+    var h = escapeHtml(String(text));
+    h = h.replace(/```([\s\S]*?)```/g, function (_, c) { return "<pre>" + c.replace(/^\n+/, "") + "</pre>"; });
+    h = h.replace(/`([^`]+)`/g, "<code>$1</code>");
+    h = h.replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>");
+    h = h.replace(/(^|<br>)\s*[-*•]\s+/g, "$1• ");
+    h = h.replace(/\n/g, "<br>");
+    return h;
+  }
+  function addCopyBtn(el, text) {
+    if (el.querySelector(".copy-btn")) return;
+    var b = document.createElement("button");
+    b.className = "copy-btn"; b.type = "button"; b.setAttribute("aria-label", "Copiar"); b.textContent = "⧉";
+    b.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var t = el.getAttribute("data-raw") || text;
+      try { navigator.clipboard.writeText(t); } catch (err) {}
+      b.textContent = "✓"; setTimeout(function () { b.textContent = "⧉"; }, 1200);
+    });
+    el.appendChild(b);
+  }
+  // Rellena una burbuja: markdown en las de JARVIS (jv), texto plano en el resto, + botón copiar (jv/me).
+  function fillBubble(el, text) {
+    el.setAttribute("data-raw", String(text));
+    if (el.classList.contains("jv")) el.innerHTML = renderRich(text);
+    else el.textContent = String(text);
+    if (el.classList.contains("jv") || el.classList.contains("me")) addCopyBtn(el, text);
+  }
   function addMsg(text, cls) {
     var d = document.createElement("div");
     d.className = "msg " + cls;
-    d.textContent = text;
+    fillBubble(d, text);
     var log = $("log");
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
@@ -32,23 +61,93 @@
   // Actualiza el texto de un mensaje Y su clon en el chat del Super.
   function setMsg(el, text) {
     if (!el) return;
-    el.classList.remove("agent"); el.textContent = text;
-    if (el._mirror) { el._mirror.classList.remove("agent"); el._mirror.textContent = text; }
+    el.classList.remove("agent"); fillBubble(el, text);
+    if (el._mirror) { el._mirror.classList.remove("agent"); fillBubble(el._mirror, text); }
   }
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
-  // Pinta una imagen generada en el chat (y la espeja en el Super). Tocar la imagen la abre a tamaño
-  // completo (mantén pulsado → guardar). El enlace «Abrir/Descargar» también la abre.
+  // Pinta una imagen generada en el chat (y la espeja en el Super). Tocar la imagen → lightbox a
+  // pantalla completa con la imagen YA cargada (NO se vuelve a navegar a la URL firmada de OSS, que
+  // daba "SignatureDoesNotMatch"). Con zoom por toque y descarga por blob.
   function addImage(url, caption) {
-    var safe = encodeURI(String(url));
-    var html = '<img class="genimg" src="' + safe + '" alt="' + escapeHtml(caption || "imagen") + '" loading="lazy">' +
-      '<a class="img-dl" href="' + safe + '" target="_blank" rel="noopener" download="jarvis-imagen.png">⬇ Abrir / Descargar</a>';
-    var d = document.createElement("div");
-    d.className = "msg jv img";
-    d.innerHTML = html;
+    var raw = String(url);
+    function build() {
+      var wrap = document.createElement("div");
+      wrap.className = "msg jv img";
+      var img = document.createElement("img");
+      img.className = "genimg"; img.src = raw; img.alt = caption || "imagen"; img.loading = "lazy";
+      img.addEventListener("click", function () { openLightbox(raw); });
+      var dl = document.createElement("button");
+      dl.className = "img-dl"; dl.type = "button"; dl.textContent = "🔍 Ver grande / Descargar";
+      dl.addEventListener("click", function () { openLightbox(raw); });
+      wrap.appendChild(img); wrap.appendChild(dl);
+      return wrap;
+    }
+    var d = build();
     var log = $("log"); log.appendChild(d); log.scrollTop = log.scrollHeight;
     var slog = $("super-log");
-    if (slog) { var c = d.cloneNode(true); slog.appendChild(c); slog.scrollTop = slog.scrollHeight; }
+    if (slog) { var c = build(); slog.appendChild(c); slog.scrollTop = slog.scrollHeight; }
     return d;
+  }
+  // Lightbox para ver imágenes grandes con zoom (doble función: tocar = zoom; tocar fondo = cerrar).
+  var _lb = null;
+  function openLightbox(url) {
+    if (!_lb) {
+      _lb = document.createElement("div");
+      _lb.id = "img-lightbox";
+      _lb.innerHTML = '<button class="lb-x" type="button" aria-label="Cerrar">✕</button><img alt="imagen"><button class="lb-dl" type="button">⬇ Descargar</button>';
+      document.body.appendChild(_lb);
+      var im = _lb.querySelector("img");
+      _lb.querySelector(".lb-x").addEventListener("click", closeLightbox);
+      _lb.addEventListener("click", function (e) { if (e.target === _lb) closeLightbox(); });   // tocar el fondo cierra
+      im.addEventListener("click", function (e) { e.stopPropagation(); im.classList.toggle("zoom"); });  // tocar la imagen = zoom
+      _lb.querySelector(".lb-dl").addEventListener("click", function (e) { e.stopPropagation(); downloadImage(im.src); });
+    }
+    var img = _lb.querySelector("img"); img.classList.remove("zoom"); img.src = url;
+    _lb.classList.add("show");
+  }
+  function closeLightbox() { if (_lb) _lb.classList.remove("show"); }
+  // Pinta un vídeo generado (reproductor + enlace). El download_url es una URL firmada (~9h).
+  function addVideo(url, caption) {
+    var raw = String(url);
+    function build() {
+      var wrap = document.createElement("div"); wrap.className = "msg jv img";
+      var v = document.createElement("video"); v.className = "genvid"; v.src = raw; v.controls = true; v.setAttribute("playsinline", ""); v.setAttribute("preload", "metadata");
+      var dl = document.createElement("a"); dl.className = "img-dl"; dl.href = raw; dl.target = "_blank"; dl.rel = "noopener"; dl.textContent = "⬇ Abrir / Descargar vídeo";
+      wrap.appendChild(v); wrap.appendChild(dl); return wrap;
+    }
+    var d = build(); var log = $("log"); log.appendChild(d); log.scrollTop = log.scrollHeight;
+    var slog = $("super-log"); if (slog) { var c = build(); slog.appendChild(c); slog.scrollTop = slog.scrollHeight; }
+    return d;
+  }
+  // Pinta una web/HTML generada: preview en iframe + Abrir (blob) + Descargar .html.
+  function addWeb(html, caption) {
+    function build() {
+      var wrap = document.createElement("div"); wrap.className = "msg jv web";
+      var frame = document.createElement("iframe"); frame.className = "genweb"; frame.setAttribute("sandbox", "allow-scripts allow-same-origin"); frame.srcdoc = html;
+      var row = document.createElement("div"); row.className = "web-actions";
+      var open = document.createElement("button"); open.type = "button"; open.className = "img-dl"; open.textContent = "↗ Abrir";
+      var dl = document.createElement("button"); dl.type = "button"; dl.className = "img-dl"; dl.textContent = "⬇ Descargar .html";
+      open.addEventListener("click", function () { openHtml(html); });
+      dl.addEventListener("click", function () { downloadHtml(html); });
+      row.appendChild(open); row.appendChild(dl);
+      wrap.appendChild(frame); wrap.appendChild(row); return wrap;
+    }
+    var d = build(); var log = $("log"); log.appendChild(d); log.scrollTop = log.scrollHeight;
+    var slog = $("super-log"); if (slog) { var c = build(); slog.appendChild(c); slog.scrollTop = slog.scrollHeight; }
+    return d;
+  }
+  function openHtml(html) { try { var b = new Blob([html], { type: "text/html" }); var u = URL.createObjectURL(b); window.open(u, "_blank"); setTimeout(function () { URL.revokeObjectURL(u); }, 30000); } catch (e) {} }
+  function downloadHtml(html) { try { var b = new Blob([html], { type: "text/html" }); var u = URL.createObjectURL(b); var a = document.createElement("a"); a.href = u; a.download = "jarvis-web-" + Date.now() + ".html"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 5000); } catch (e) {} }
+  // Descarga por blob (no caduca y evita el error de firma de la URL). Si OSS bloquea CORS, avisa.
+  function downloadImage(url) {
+    fetch(url).then(function (r) { if (!r.ok) throw new Error("http"); return r.blob(); }).then(function (b) {
+      var u = URL.createObjectURL(b);
+      var a = document.createElement("a"); a.href = u; a.download = "jarvis-" + Date.now() + ".png";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { try { URL.revokeObjectURL(u); } catch (e) {} }, 5000);
+    }).catch(function () {
+      addMsg("Para guardarla, mantén pulsada la imagen y elige «Descargar imagen», señor.", "sys");
+    });
   }
   // Convierte un globo en una tarjeta de "agente trabajando" (reactor girando + texto + puntos).
   function setAgent(el, label) {
@@ -83,6 +182,104 @@
     if (/\b(limpia|limpiar|borra|borrar|vacia|vaciar|resetea|resetear|elimina|eliminar)\b/.test(nrm) &&
         /\b(chat|conversacion|charla|historial|mensajes|memoria)\b/.test(nrm)) {
       clearChat(); return;
+    }
+
+    // ¿Alarmas/recordatorios? (HABLADOS, mientras la app esté abierta)
+    if (/\b(borra|quita|elimina|cancela|para)\b.*\balarmas?\b|\bcancela.*recordatorios?\b/.test(nrm)) {
+      saveAlarms([]); var rep = "Alarmas y recordatorios borrados, señor."; addMsg(rep, "jv"); speak(rep); return;
+    }
+    if (/\b(mis|cuantas|que|lista de)\s+alarmas?\b|\bque recordatorios\b/.test(nrm)) {
+      var al = loadAlarms();
+      if (!al.length) { addMsg("No tiene ninguna alarma puesta, señor.", "jv"); }
+      else {
+        var list = al.map(function (x) { var w = new Date(x.at); return "• " + pad2(w.getHours()) + ":" + pad2(w.getMinutes()) + (x.label ? (" — " + x.label.replace(/^le recuerdo: /, "")) : ""); }).join("\n");
+        addMsg("Sus alarmas, señor:\n" + list, "jv");
+      }
+      return;
+    }
+    var alarmReply = parseAndSetAlarm(text);
+    if (alarmReply) { addMsg(alarmReply, "jv"); speak(alarmReply); if (window.API && window.API.addExchange) API.addExchange(text, alarmReply); return; }
+
+    // ¿Enviar un WhatsApp con texto? Abre WhatsApp con el mensaje escrito (el usuario pulsa enviar).
+    var wp = parseWhatsApp(text);
+    if (wp) {
+      Voice.unlock();
+      window.Links.sendWhatsApp(wp.msg, wp.number);
+      var wrep = wp.msg ? "Abriendo WhatsApp con tu mensaje, señor. Solo pulsa enviar." : "Abriendo WhatsApp, señor.";
+      addMsg(wrep, "jv"); speak(wrep);
+      if (window.API && window.API.addExchange) API.addExchange(text, wrep);
+      return;
+    }
+
+    // 0z) ¿Pide LANZAR AGENTES / crear contenido a partir de TENDENCIAS? Cadena: buscar → idea → crear.
+    var ca = (window.API && window.API.asContentAgent) ? window.API.asContentAgent(text) : null;
+    if (ca) {
+      if (!CFG.key) { addMsg("Falta tu API key de MiniMax, señor. Pulsa el engranaje ⚙.", "jv"); openSettings(); return; }
+      busy = true; setState("thinking");
+      var acard = addMsg("…", "jv");
+      setAgent(acard, "Agente 1 · buscando tendencias…");
+      API.search("tendencias virales en redes sociales hoy").then(function (info) {
+        setAgent(acard, "Agente 2 · pensando una idea…");
+        return API.ask("Tendencias de hoy:\n" + (info || "(sin datos)") + "\n\nPropón UNA idea concreta para un " + ca.kind + " corto y viral para redes sociales. Responde SOLO con la descripción visual (el prompt), 1-2 frases, en español, sin preámbulos.",
+          "Eres un creativo de contenido viral. Respondes solo con la idea/prompt visual, sin explicaciones.");
+      }).then(function (idea) {
+        idea = (idea || "").trim() || ("un " + ca.kind + " dinámico y llamativo sobre una tendencia actual");
+        addMsg("💡 Idea: " + idea, "sys");
+        setAgent(acard, "Agente 3 · creando el " + ca.kind + "…");
+        if (ca.kind === "imagen") {
+          return API.generateImage(idea, "9:16").then(function (urls) {
+            busy = false; setState(""); setMsg(acard, "Aquí tienes el contenido, señor.");
+            (urls || []).forEach(function (u) { addImage(u, idea); });
+            addMsg("Para subirlo a redes, descárgalo y súbelo tú; la subida automática llegará con la app nativa, señor.", "sys");
+            speak("Listo, señor.");
+          });
+        }
+        return API.generateVideo(idea, function (s) { setAgent(acard, s); }).then(function (url) {
+          busy = false; setState(""); setMsg(acard, "Aquí tienes tu vídeo, señor.");
+          addVideo(url, idea);
+          addMsg("Para subirlo a redes, descárgalo y súbelo tú; la subida automática llegará con la app nativa, señor.", "sys");
+          speak("Listo, señor.");
+        });
+      }).catch(function (e) { busy = false; setState(""); setMsg(acard, "No pude completarlo, señor: " + (e && e.message || e)); });
+      return;
+    }
+
+    // 0a) ¿Pide CREAR UN VÍDEO? → MiniMax Hailuo (asíncrono, tarda minutos). Antes que imagen.
+    var vidPrompt = (window.API && window.API.asVideoPrompt) ? window.API.asVideoPrompt(text) : null;
+    if (vidPrompt) {
+      if (!CFG.key) { addMsg("Falta tu API key de MiniMax, señor. Pulsa el engranaje ⚙.", "jv"); openSettings(); return; }
+      busy = true; setState("thinking");
+      var vcard = addMsg("…", "jv");
+      setAgent(vcard, "Creando tu vídeo (tarda unos minutos, señor)…");
+      API.generateVideo(vidPrompt, function (s) { setAgent(vcard, s); }).then(function (url) {
+        busy = false; setState("");
+        setMsg(vcard, "Aquí tiene su vídeo, señor.");
+        addVideo(url, vidPrompt);
+        speak("Aquí tiene su vídeo, señor.");
+      }).catch(function (e) {
+        busy = false; setState("");
+        setMsg(vcard, "No pude crear el vídeo, señor: " + (e && e.message || e));
+      });
+      return;
+    }
+
+    // 0b) ¿Pide CREAR UNA WEB / PÁGINA? → MiniMax genera el HTML (vía el chat) y lo mostramos.
+    var webPrompt = (window.API && window.API.asWebPrompt) ? window.API.asWebPrompt(text) : null;
+    if (webPrompt) {
+      if (!CFG.key) { addMsg("Falta tu API key de MiniMax, señor. Pulsa el engranaje ⚙.", "jv"); openSettings(); return; }
+      busy = true; setState("thinking");
+      var wcard = addMsg("…", "jv");
+      setAgent(wcard, "Creando tu web…");
+      API.generateWeb(webPrompt).then(function (html) {
+        busy = false; setState("");
+        setMsg(wcard, "Aquí tiene su web, señor. Tóquela para abrirla o descárguela.");
+        addWeb(html, webPrompt);
+        speak("Aquí tiene su web, señor.");
+      }).catch(function (e) {
+        busy = false; setState("");
+        setMsg(wcard, "No pude crear la web, señor: " + (e && e.message || e));
+      });
+      return;
     }
 
     // 0) ¿Pide CREAR UNA IMAGEN? → la generamos con MiniMax (image-01) vía el Worker, sin pasar por
@@ -146,6 +343,72 @@
     var ms = Math.min(30000, Math.max(6000, text.length * 90));
     _speakSafety = setTimeout(clear, ms);
     Voice.speak(text, null, clear);
+  }
+
+  // ── Alarmas / recordatorios HABLADOS (mientras la app esté abierta; en 2º plano cerrado → APK) ──
+  function loadAlarms() { try { return JSON.parse(localStorage.getItem("mm_alarms") || "[]") || []; } catch (e) { return []; } }
+  function saveAlarms(a) { try { localStorage.setItem("mm_alarms", JSON.stringify(a)); } catch (e) {} }
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  var _alarmTimer = null;
+  function startAlarmWatch() { if (_alarmTimer) return; _alarmTimer = setInterval(checkAlarms, 15000); checkAlarms(); }
+  function checkAlarms() {
+    var now = Date.now(), a = loadAlarms();
+    var due = a.filter(function (x) { return x.at <= now; });
+    if (!due.length) return;
+    saveAlarms(a.filter(function (x) { return x.at > now; }));
+    due.forEach(function (al) {
+      var phrase = "Señor, " + (al.label || "tiene su aviso") + ".";
+      addMsg("⏰ " + phrase, "jv");
+      try { if (window.sfx && window.sfx.beep) window.sfx.beep(); } catch (e) {}
+      try { if ("Notification" in window && Notification.permission === "granted") new Notification("JARVIS", { body: phrase }); } catch (e) {}
+      speak(phrase);
+    });
+  }
+  // Detecta y programa una alarma/recordatorio. Devuelve la frase de confirmación o null.
+  function parseAndSetAlarm(text) {
+    var n = (text || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    if (!/\b(alarma|recuerdame|recuerda|recordatorio|avisame|avisa|despiertame|despierta|programa)\b/.test(n)) return null;
+    var at = null;
+    var mRel = n.match(/\ben\s+(\d{1,3})\s*(segundos?|seg|minutos?|min|horas?|h)\b/);
+    if (mRel) {
+      var q = parseInt(mRel[1], 10), u = mRel[2];
+      var ms = /seg/.test(u) ? q * 1000 : /(hora|h)/.test(u) ? q * 3600000 : q * 60000;
+      at = Date.now() + ms;
+    }
+    if (!at) {
+      var mAbs = n.match(/a\s+las?\s+(\d{1,2})(?:[:\.](\d{2}))?\s*(de la (?:manana|tarde|noche)|am|pm|h)?/);
+      if (mAbs) {
+        var hh = parseInt(mAbs[1], 10), mm = mAbs[2] ? parseInt(mAbs[2], 10) : 0, mod = mAbs[3] || "";
+        if (/(tarde|noche|pm)/.test(mod) && hh < 12) hh += 12;
+        if (/(manana|am)/.test(mod) && hh === 12) hh = 0;
+        var d = new Date(); d.setHours(hh, mm, 0, 0);
+        if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+        at = d.getTime();
+      }
+    }
+    if (!at) return null;
+    var label = "";
+    var mL = text.match(/\b(?:para|de|que|a)\s+(.+?)(?:\s+(?:a las|en)\b.*)?$/i);
+    if (mL && mL[1] && mL[1].trim().length > 2 && !/^\d/.test(mL[1].trim()) && !/^las?\b/i.test(mL[1].trim())) {
+      label = "le recuerdo: " + mL[1].trim();
+    }
+    var a = loadAlarms(); a.push({ id: "a" + Date.now(), at: at, label: label }); saveAlarms(a);
+    startAlarmWatch();
+    try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
+    var w = new Date(at), hhmm = pad2(w.getHours()) + ":" + pad2(w.getMinutes());
+    return "Hecho, señor. Le avisaré a las " + hhmm + (label ? (" — " + label.replace(/^le recuerdo: /, "")) : "") + ". (Mientras JARVIS esté abierto; la alarma con la app cerrada llegará con la app nativa.)";
+  }
+
+  // Detecta "envía a X por WhatsApp: mensaje" → {msg, number}. Requiere mencionar WhatsApp.
+  function parseWhatsApp(text) {
+    var n = (text || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    if (!/\bwhatsapp\b|\bwasap\b|\bguasap\b/.test(n)) return null;
+    if (!/\b(envia|enviale|enviar|manda|mandale|mandar|escribe|escribele|escribir|dile|mensaje|mandame)\b/.test(n)) return null;
+    var msg = "";
+    var mC = text.match(/:\s*([\s\S]+)$/); if (mC) msg = mC[1].trim();
+    if (!msg) { var mQ = text.match(/\b(?:que|diciendo|dile que|poniendo|ponle)\s+([\s\S]+)$/i); if (mQ) msg = mQ[1].trim(); }
+    var mN = n.match(/(\+?\d[\d\s]{6,}\d)/); var num = mN ? mN[1].replace(/[^\d]/g, "") : "";
+    return { msg: msg, number: num };
   }
 
   // Borra la conversación ACTIVA (chat normal + Super) PERO conserva los hechos de Eric (mm_facts).
@@ -452,6 +715,7 @@
     }
     setupAutoUpdate();
     notifyVersion();
+    startAlarmWatch();   // reanuda alarmas pendientes de sesiones anteriores
 
 
     // Saludo / pedir key — DESPUÉS de la intro.
