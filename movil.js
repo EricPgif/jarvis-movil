@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "4.7";
-  var WHATS_NEW = "Arreglos: al analizar imágenes ya no sale texto raro en inglés; abrir apps (WhatsApp, YouTube, Telegram…) abre la APP de verdad; y el contador de mensajes muestra el número real. NUEVO: voz PREMIUM opcional con ElevenLabs (voz de mayordomo británico) — mete tu key en Ajustes.";
+  var APP_VERSION = "4.8";
+  var WHATS_NEW = "Ya puedes descargar la app Android (APK) desde Ajustes → «App Android (APK)» y compartir el enlace. Y voz premium ElevenLabs opcional. (En la app Android: alarmas que hablan con la app cerrada.)";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
