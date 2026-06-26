@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "5.1";
-  var WHATS_NEW = "Nuevo cerebro con HERRAMIENTAS: ahora JARVIS DECIDE y encadena acciones (busca, crea imagen/vídeo/web, abre apps, alarmas, SMS, archivos, memoria) en vez de adivinar por palabras clave. Memoria mejorada (recuerda hechos a voluntad). Nuevo botón «🩺 Diagnóstico» en Ajustes para ver qué funciona en el APK. Reinstala el APK (DESINSTALA el viejo primero).";
+  var APP_VERSION = "5.2";
+  var WHATS_NEW = "Nuevo cerebro con HERRAMIENTAS: JARVIS DECIDE y encadena acciones (busca, crea imagen/vídeo/web, abre apps, alarmas, SMS, archivos, memoria) en vez de adivinar por palabras clave. Revisado a fondo: las acciones que actúan solas (SMS, llamadas) PIDEN CONFIRMACIÓN antes; alarmas más fiables; memoria más honesta. Nuevo botón «🩺 Diagnóstico» en Ajustes. Reinstala el APK (DESINSTALA el viejo primero).";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -443,6 +443,13 @@
   function loadAlarms() { try { return JSON.parse(localStorage.getItem("mm_alarms") || "[]") || []; } catch (e) { return []; } }
   function saveAlarms(a) { try { localStorage.setItem("mm_alarms", JSON.stringify(a)); } catch (e) {} }
   function pad2(n) { return String(n).padStart(2, "0"); }
+  // Si el plugin NATIVO de alarma falla al programarla, la degradamos a alarma JS (suena con la app
+  // abierta) en vez de dejar una alarma FANTASMA marcada native:true que checkAlarms() ignora siempre.
+  function downgradeAlarm(id) {
+    var a = loadAlarms(), ch = false;
+    for (var i = 0; i < a.length; i++) if (a[i].id === id && a[i].native) { a[i].native = false; ch = true; }
+    if (ch) { saveAlarms(a); startAlarmWatch(); try { addMsg("La alarma en 2º plano no se pudo registrar, señor; sonará si la app está abierta.", "sys"); } catch (e) {} }
+  }
   // Plugin NATIVO de alarmas (solo existe dentro del APK): suena/habla con la app cerrada.
   function nativeAlarm() {
     try { if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.registerPlugin) return window.Capacitor.registerPlugin("JarvisAlarm"); } catch (e) {}
@@ -499,9 +506,10 @@
     // En el APK: alarma NATIVA (habla aunque la app esté cerrada).
     var na = nativeAlarm();
     if (na) {
-      try { na.set({ at: at, id: id, phrase: "Señor, " + spoken + "." }).catch(function () {}); } catch (e) {}
       var an = loadAlarms(); an.push({ id: id, at: at, label: label, native: true }); saveAlarms(an);
       startAlarmWatch();
+      try { na.set({ at: at, id: id, phrase: "Señor, " + spoken + "." }).catch(function () { downgradeAlarm(id); }); }
+      catch (e) { downgradeAlarm(id); }
       return "Hecho, señor. Le avisaré a las " + hhmm + labelTxt + ", aunque cierre la app.";
     }
     // En la web: temporizador interno (solo con la app abierta).
@@ -537,8 +545,9 @@
     var w = new Date(at), hhmm = pad2(w.getHours()) + ":" + pad2(w.getMinutes());
     var na = nativeAlarm();
     if (na) {
-      try { na.set({ at: at, id: id, phrase: "Señor, " + spoken + "." }).catch(function () {}); } catch (e) {}
       var an = loadAlarms(); an.push({ id: id, at: at, label: spoken, native: true }); saveAlarms(an); startAlarmWatch();
+      try { na.set({ at: at, id: id, phrase: "Señor, " + spoken + "." }).catch(function () { downgradeAlarm(id); }); }
+      catch (e) { downgradeAlarm(id); }
       return "Hecho. Le avisaré a las " + hhmm + " — " + label + ", aunque cierre la app.";
     }
     var a = loadAlarms(); a.push({ id: id, at: at, label: spoken }); saveAlarms(a); startAlarmWatch();

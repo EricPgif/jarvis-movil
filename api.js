@@ -118,8 +118,8 @@
       input_schema: O("object", { prompt: S("Descripción de la escena del vídeo.") }, ["prompt"]) },
     { name: "crear_web", description: "Genera una página WEB/HTML autocontenida y la muestra (preview + descargar). Para 'hazme una web/página/landing de…'.",
       input_schema: O("object", { descripcion: S("Qué web/página crear.") }, ["descripcion"]) },
-    { name: "analizar_imagen", description: "Analiza una imagen que el usuario HA ADJUNTADO (con el clip 📎). No la uses si no hay imagen adjunta.",
-      input_schema: O("object", { pregunta: S("Qué quiere saber de la imagen.") }, ["pregunta"]) },
+    { name: "analizar_imagen", description: "Indica al usuario CÓMO hacer que analices una imagen: debe adjuntarla con el clip 📎 y entonces se analiza al instante. Úsala solo si pide analizar una foto pero NO la ha adjuntado.",
+      input_schema: O("object", { pregunta: S("Qué quiere saber de la imagen (opcional).") }, []) },
     { name: "ver_pantalla", description: "Captura la PANTALLA del móvil y la analiza (solo APK). Para «mira la pantalla / ¿qué es esto? / ¿qué mod es este vídeo?».",
       input_schema: O("object", { pregunta: S("Qué quiere saber de la pantalla.") }, []) },
     { name: "abrir_app", description: "Abre una app del móvil. apps: spotify, youtube, whatsapp, telegram, gmail, chrome, instagram, tiktok, twitter, reddit, twitch, netflix, discord, maps, calendario, camara.",
@@ -178,9 +178,23 @@
   function isApk() { try { return !!(window.Native && window.Native.isNative()); } catch (e) { return false; } }
   function P(v) { return Promise.resolve(v); }
 
+  // Herramientas que ACTÚAN solas (sin que el usuario pulse nada): exigen confirmación explícita
+  // antes de ejecutarse, aunque el modelo se salte la confirmación en lenguaje natural. enviar_whatsapp
+  // NO está aquí porque abre WhatsApp con el texto y el usuario aún pulsa "enviar" (eso ya es confirmar).
+  var CRITICAL = { mandar_sms: 1, llamar: 1 };
+  // ¿El último mensaje del usuario es un "sí" / confirmación?
+  function isAffirmative(t) {
+    t = (t || "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    return /^(s|si|claro|vale|venga|dale|ok|okay|okey|perfecto|de acuerdo|adelante|hazlo|hazla|hacelo|confirm|confirmo|confirmado|envia|envialo|mandalo|manda|llama|llamalo|procede|correcto|eso es|exacto)\b/.test(t)
+        || /\b(confirm\w*|adelante|hazlo|env[ií]alo|m[aá]ndalo|ll[aá]mal[oa])\b/.test(t);
+  }
+
   // Ejecuta una herramienta → devuelve texto para el tool_result. El modelo lo funde en su respuesta.
-  function execTool(tu, onStatus) {
+  // confirmed = el usuario ya dijo "sí" en este turno (gate de acciones críticas).
+  function execTool(tu, onStatus, confirmed) {
     var name = tu.name, inp = tu.input || {};
+    if (CRITICAL[name] && !confirmed)
+      return P("ACCIÓN CRÍTICA NO CONFIRMADA. No la ejecutes todavía: resume al usuario exactamente qué vas a hacer (a quién y qué) y pídele que confirme con un 'sí'. Solo cuando él confirme se ejecutará.");
     function st(m) { if (onStatus) { try { onStatus(m); } catch (e) {} } }
     try {
       switch (name) {
@@ -224,7 +238,7 @@
           return P(said ? ("Abriendo " + inp.app + ".") : ("No conozco la app '" + inp.app + "'."));
         }
         case "enviar_whatsapp":
-          if (window.Links && window.Links.sendWhatsApp) window.Links.sendWhatsApp(inp.mensaje || "", inp.numero || inp.destinatario || "");
+          if (window.Links && window.Links.sendWhatsApp) window.Links.sendWhatsApp(inp.mensaje || "", inp.numero || "");
           return P("WhatsApp abierto con el mensaje preparado; el usuario lo envía.");
 
         case "mandar_sms":
@@ -268,10 +282,11 @@
 
         case "guardar_memoria":
           try {
-            if (window.Mem && window.Mem.add) window.Mem.add(inp.hecho, inp.categoria);
-            else if (window.Mem && window.Mem.capture) window.Mem.capture(inp.hecho);
-          } catch (e) {}
-          return P("Guardado en memoria, señor.");
+            var ok = false;
+            if (window.Mem && window.Mem.add) ok = window.Mem.add(inp.hecho, inp.categoria);
+            else if (window.Mem && window.Mem.capture) { window.Mem.capture(inp.hecho); ok = true; }
+            return P(ok ? "Guardado en memoria, señor." : "Eso ya lo tenía guardado (o no había nada que guardar), señor.");
+          } catch (e) { return P("No pude guardar ese dato, señor."); }
 
         default:
           return P("Herramienta '" + name + "' no disponible.");
@@ -344,6 +359,7 @@
     saveHist();
     var messages = H().slice(-CTX_MAX);   // a MiniMax solo las últimas ~24 (coste); el resto se ve igual
     var didSearch = false;
+    var confirmed = isAffirmative(userText);   // gate de acciones críticas (SMS/llamada)
     function injectSearch(info) {
       var i = messages.length - 1;
       if (info && messages[i] && messages[i].role === "user" && typeof messages[i].content === "string") {
@@ -361,7 +377,7 @@
           didSearch = true;
           messages.push({ role: "assistant", content: blocks });
           return Promise.all(toolUses.map(function (tu) {
-            return execTool(tu, onStatus).then(function (res) {
+            return execTool(tu, onStatus, confirmed).then(function (res) {
               return { type: "tool_result", tool_use_id: tu.id, content: String(res).slice(0, 4000) };
             });
           })).then(function (results) { messages.push({ role: "user", content: results }); return loop(depth + 1); });
@@ -372,7 +388,7 @@
         if (tc && depth < 3) {
           didSearch = true;
           messages.push({ role: "assistant", content: rawText });
-          return execTool({ name: tc.name, input: tc.input, id: "t" + depth }, onStatus).then(function (res) {
+          return execTool({ name: tc.name, input: tc.input, id: "t" + depth }, onStatus, confirmed).then(function (res) {
             messages.push({ role: "user", content: "[Resultado de la herramienta " + tc.name + "]:\n" + String(res).slice(0, 4000) + "\n\nResponde ahora al usuario en español de España, con texto natural, sin mostrar la herramienta ni su resultado crudo." });
             return loop(depth + 1);
           });

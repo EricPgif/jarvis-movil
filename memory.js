@@ -126,7 +126,7 @@
       var top = tk.slice(0, 5).filter(function (k) { return o.topics[k] >= 2; });
       if (top.length) lines.push("- Temas en los que anda últimamente: " + top.join(", ") + ".");
     }
-    if (o.facts.length) lines.push("- Recuerda: " + o.facts.slice(-5).join("; ") + ".");
+    if (o.facts.length) lines.push("- Recuerda: " + o.facts.slice(-5).map(function (f) { return typeof f === "string" ? f : (f && f.t) || ""; }).filter(Boolean).join("; ") + ".");
     if (!lines.length) return "";
     return "LO QUE SABES DE ERIC (memoria persistente; úsala con naturalidad, no la recites):\n" + lines.join("\n");
   }
