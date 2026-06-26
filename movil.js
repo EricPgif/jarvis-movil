@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "5.2";
-  var WHATS_NEW = "Nuevo cerebro con HERRAMIENTAS: JARVIS DECIDE y encadena acciones (busca, crea imagen/vídeo/web, abre apps, alarmas, SMS, archivos, memoria) en vez de adivinar por palabras clave. Revisado a fondo: las acciones que actúan solas (SMS, llamadas) PIDEN CONFIRMACIÓN antes; alarmas más fiables; memoria más honesta. Nuevo botón «🩺 Diagnóstico» en Ajustes. Reinstala el APK (DESINSTALA el viejo primero).";
+  var APP_VERSION = "5.3";
+  var WHATS_NEW = "NUEVO ICONO oficial (tu logo del reactor JARVIS). Además, desde la v5.2: cerebro con HERRAMIENTAS (JARVIS decide y encadena acciones), las acciones que actúan solas (SMS, llamadas) PIDEN CONFIRMACIÓN, alarmas más fiables y botón «🩺 Diagnóstico» en Ajustes. Para ver el icono nuevo, DESINSTALA el APK viejo y reinstala.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
