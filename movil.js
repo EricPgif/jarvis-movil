@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "5.3";
-  var WHATS_NEW = "NUEVO ICONO oficial (tu logo del reactor JARVIS). Además, desde la v5.2: cerebro con HERRAMIENTAS (JARVIS decide y encadena acciones), las acciones que actúan solas (SMS, llamadas) PIDEN CONFIRMACIÓN, alarmas más fiables y botón «🩺 Diagnóstico» en Ajustes. Para ver el icono nuevo, DESINSTALA el APK viejo y reinstala.";
+  var APP_VERSION = "5.4";
+  var WHATS_NEW = "ARREGLADO LO IMPORTANTE: ahora SÍ funcionan abrir apps, llamadas, SMS, leer notificaciones, ver/controlar pantalla y alarmas (un fallo de carga tenía TODOS los plugins bloqueados). Además: FIRMA ESTABLE → a partir de ahora las actualizaciones se instalan ENCIMA, sin desinstalar; y botón «🔄 Buscar / instalar actualización» en Ajustes. OJO: esta vez aún hay que desinstalar el viejo (cambia la firma); desde la próxima, ya no.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -452,7 +452,12 @@
   }
   // Plugin NATIVO de alarmas (solo existe dentro del APK): suena/habla con la app cerrada.
   function nativeAlarm() {
-    try { if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.registerPlugin) return window.Capacitor.registerPlugin("JarvisAlarm"); } catch (e) {}
+    try {
+      var C = window.Capacitor;
+      if (!(C && C.isNativePlatform && C.isNativePlatform())) return null;
+      if (C.Plugins && C.Plugins.JarvisAlarm) return C.Plugins.JarvisAlarm;   // vía que funciona (bridge)
+      if (typeof C.registerPlugin === "function") return C.registerPlugin("JarvisAlarm");
+    } catch (e) {}
     return null;
   }
   var _alarmTimer = null;
@@ -803,6 +808,9 @@
       }
       addMsg(lines.join("\n"), "sys");
     });
+    if ($("cfg-update")) $("cfg-update").addEventListener("click", function () {
+      closeSettings(); doUpdate();
+    });
     $("cfg-sfx").addEventListener("click", function () {
       if (!window.sfx) return;
       var on = !window.sfx.enabled; window.sfx.setEnabled(on);
@@ -828,6 +836,29 @@
     wireDock();
   }
 
+  // ── Actualización del APK (firma estable → se instala ENCIMA, sin desinstalar) ──
+  var APK_URL = "https://ericpgif.github.io/jarvis-movil/jarvis.apk";
+  function doUpdate() {
+    addMsg("Descargando la última versión, señor. Cuando acabe la descarga, ÁBRELA e instálala — se instala encima, ya no hay que desinstalar.", "sys");
+    try {
+      if (window.Native && window.Native.isNative() && window.Native.openExternal)
+        window.Native.openExternal(APK_URL).catch(function (e) { addMsg("No pude abrir la descarga, señor: " + (e && e.message || e), "sys"); });
+      else window.open(APK_URL, "_blank");
+    } catch (e) { addMsg("No pude abrir la descarga, señor.", "sys"); }
+  }
+  // En el APK, al arrancar comprueba si hay una versión más nueva publicada y avisa (no descarga solo).
+  function checkNativeUpdate() {
+    try {
+      fetch("https://ericpgif.github.io/jarvis-movil/version.json?_=" + Date.now(), { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (v) {
+          var served = v && v.version;
+          if (!served || served === APP_VERSION) return;
+          addMsg("🔄 Hay una versión nueva de JARVIS (v" + served + "), señor. Ve a Ajustes → «Buscar / instalar actualización» para ponerla (se instala encima, sin desinstalar).", "sys");
+        }).catch(function () {});
+    } catch (e) {}
+  }
+
   // ── Auto-actualización (sin reinstalar) ──
   var _swReg = null;
   function setupAutoUpdate() {
@@ -836,6 +867,7 @@
     if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
       try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { try { r.unregister(); } catch (e) {} }); }); } catch (e) {}
       try { if (window.caches) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (e) {} }); }); } catch (e) {}
+      setTimeout(checkNativeUpdate, 4000);   // avisa si hay APK más nuevo (tras cargar el chat)
       return;
     }
     if (!("serviceWorker" in navigator)) return;

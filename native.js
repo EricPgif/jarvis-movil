@@ -4,7 +4,19 @@
 (function () {
   "use strict";
   function isNative() { try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; } }
-  function reg(name) { try { return (isNative() && window.Capacitor.registerPlugin) ? window.Capacitor.registerPlugin(name) : null; } catch (e) { return null; } }
+  // Obtiene un plugin nativo por nombre. El bridge de Capacitor 8 expone los plugins REGISTRADOS en
+  // `Capacitor.Plugins` (proxy) — es la vía que SÍ funciona (igual que SpeechRecognition/Filesystem).
+  // `registerPlugin` se queda como respaldo. (Antes usábamos solo registerPlugin → no resolvía los
+  // plugins propios y "no cargaba nada": abrir apps, llamar, SMS, notificaciones, pantalla, alarmas.)
+  function reg(name) {
+    try {
+      if (!isNative()) return null;
+      var C = window.Capacitor || {};
+      if (C.Plugins && C.Plugins[name]) return C.Plugins[name];
+      if (typeof C.registerPlugin === "function") return C.registerPlugin(name);
+      return null;
+    } catch (e) { return null; }
+  }
   var P = {};
   function plugins() {
     if (!isNative()) return P;
@@ -56,7 +68,7 @@
       plugins: {
         JarvisOpen: !!p.Open, JarvisNotifications: !!p.Notifs, JarvisScreen: !!p.Screen,
         JarvisAccessibility: !!p.Access, JarvisCall: !!p.Call,
-        JarvisAlarm: !!(isNative() && window.Capacitor.registerPlugin && reg("JarvisAlarm")),
+        JarvisAlarm: !!reg("JarvisAlarm"),
         SpeechRecognition: !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition),
         Filesystem: !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem),
       },
