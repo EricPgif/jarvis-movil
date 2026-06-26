@@ -131,8 +131,43 @@
     return "LO QUE SABES DE ERIC (memoria persistente; úsala con naturalidad, no la recites):\n" + lines.join("\n");
   }
 
+  // Guarda un hecho ARBITRARIO a voluntad del modelo (tool guardar_memoria). Devuelve true si guardó.
+  function add(fact, category) {
+    var f = clean(fact);
+    if (!f) return false;
+    var o = load(), nf = norm(f);
+    // Si es claramente el nombre, va a personal (mejor que a facts).
+    var nm = f.match(/^se llama\s+([a-záéíóúñ]{2,20})/i) || f.match(/^su nombre es\s+([a-záéíóúñ]{2,20})/i);
+    if (nm) { var nn = clean(nm[1]); o.personal.nombre = nn.charAt(0).toUpperCase() + nn.slice(1); save(o); return true; }
+    for (var i = 0; i < o.facts.length; i++) {
+      var ex = typeof o.facts[i] === "string" ? o.facts[i] : (o.facts[i] && o.facts[i].t) || "";
+      if (norm(ex) === nf) return true;   // ya está (idempotente)
+    }
+    o.facts.push(f);
+    save(o);
+    return true;
+  }
+
+  // Recupera hechos relevantes a una consulta (solapamiento de palabras). RAG ligero, sin embeddings.
+  function search(query) {
+    var q = norm(query), qWords = q.split(/\s+/).filter(function (w) { return w.length > 2; });
+    var o = load();
+    function sc(text) { var t = norm(text), s = 0; qWords.forEach(function (w) { if (t.indexOf(w) >= 0) s++; }); return s; }
+    var pool = [];
+    if (o.personal.nombre) pool.push({ t: "Se llama " + o.personal.nombre + ".", k: "nombre " + o.personal.nombre });
+    Object.keys(o.personal).forEach(function (k) { if (k !== "nombre") pool.push({ t: k + ": " + o.personal[k], k: k + " " + o.personal[k] }); });
+    Object.keys(o.preferences).forEach(function (k) { var ln = k.replace(/_/g, " ") + " = " + o.preferences[k]; pool.push({ t: ln, k: k + " " + o.preferences[k] }); });
+    (o.facts || []).forEach(function (f) { var s = typeof f === "string" ? f : (f && f.t) || ""; pool.push({ t: s, k: s }); });
+    if (!qWords.length) return block();   // sin consulta concreta → todo el perfil
+    var hits = pool.map(function (p) { return { t: p.t, s: sc(p.k) }; })
+                   .filter(function (h) { return h.s > 0; })
+                   .sort(function (a, b) { return b.s - a.s; }).slice(0, 6);
+    if (!hits.length) return "";
+    return hits.map(function (h) { return "- " + h.t; }).join("\n");
+  }
+
   function clearProfile() { try { localStorage.removeItem(KEY); } catch (e) {} }
   function getAll() { return load(); }
 
-  window.Mem = { capture: capture, block: block, clearProfile: clearProfile, getAll: getAll };
+  window.Mem = { capture: capture, block: block, add: add, search: search, clearProfile: clearProfile, getAll: getAll };
 })();

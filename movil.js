@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "5.0";
-  var WHATS_NEW = "APK arreglado a fondo: ahora la VOZ funciona (reconocimiento nativo de Android), las apps se ABREN de verdad (WhatsApp/YouTube/Telegram…) y se quitó el Service Worker que rompía la app dentro del APK. Reinstala el APK desde Ajustes para tenerlo.";
+  var APP_VERSION = "5.1";
+  var WHATS_NEW = "Nuevo cerebro con HERRAMIENTAS: ahora JARVIS DECIDE y encadena acciones (busca, crea imagen/vídeo/web, abre apps, alarmas, SMS, archivos, memoria) en vez de adivinar por palabras clave. Memoria mejorada (recuerda hechos a voluntad). Nuevo botón «🩺 Diagnóstico» en Ajustes para ver qué funciona en el APK. Reinstala el APK (DESINSTALA el viejo primero).";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -523,6 +523,28 @@
     return { msg: msg, number: num };
   }
 
+  // Pone una alarma desde la herramienta crear_alarma ({hora,minuto,en_minutos,etiqueta}). Devuelve frase.
+  function setAlarmFromTool(inp) {
+    inp = inp || {};
+    var at, label = inp.etiqueta || "tiene su aviso";
+    if (inp.en_minutos != null) { at = Date.now() + (parseInt(inp.en_minutos, 10) || 1) * 60000; }
+    else {
+      var h = inp.hora != null ? parseInt(inp.hora, 10) : null, m = inp.minuto != null ? parseInt(inp.minuto, 10) : 0;
+      if (h == null || isNaN(h)) return "Necesito la hora para la alarma, señor.";
+      var d = new Date(); d.setHours(h, m || 0, 0, 0); if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1); at = d.getTime();
+    }
+    var id = "a" + Date.now(), spoken = "le recuerdo: " + label;
+    var w = new Date(at), hhmm = pad2(w.getHours()) + ":" + pad2(w.getMinutes());
+    var na = nativeAlarm();
+    if (na) {
+      try { na.set({ at: at, id: id, phrase: "Señor, " + spoken + "." }).catch(function () {}); } catch (e) {}
+      var an = loadAlarms(); an.push({ id: id, at: at, label: spoken, native: true }); saveAlarms(an); startAlarmWatch();
+      return "Hecho. Le avisaré a las " + hhmm + " — " + label + ", aunque cierre la app.";
+    }
+    var a = loadAlarms(); a.push({ id: id, at: at, label: spoken }); saveAlarms(a); startAlarmWatch();
+    return "Hecho. Le avisaré a las " + hhmm + " — " + label + " (mientras la app esté abierta).";
+  }
+
   // Borra la conversación ACTIVA (chat normal + Super) PERO conserva los hechos de Eric (mm_facts).
   function clearChat() {
     if (window.API && window.API.clearHistory) window.API.clearHistory();
@@ -751,6 +773,27 @@
       if (window.Native) { if (on) Native.startMic(); else Native.stopMic(); }
       addMsg(on ? "Escucha en 2º plano activada, señor." : "Escucha en 2º plano desactivada.", "sys");
     });
+    if ($("cfg-diag")) $("cfg-diag").addEventListener("click", function () {
+      closeSettings();
+      var d = (window.Native && window.Native.diagnose) ? window.Native.diagnose() : { isNative: false, plugins: {} };
+      var lines = ["🩺 Diagnóstico, señor:", "- App nativa (APK): " + (d.isNative ? "SÍ" : "no (estás en la web)")];
+      var ok = "✅", no = "❌";
+      var labels = {
+        JarvisOpen: "Abrir apps", JarvisCall: "Llamar / SMS", JarvisNotifications: "Leer notificaciones",
+        JarvisScreen: "Ver pantalla", JarvisAccessibility: "Controlar pantalla", JarvisAlarm: "Alarmas habladas",
+        SpeechRecognition: "Voz (reconocimiento)", Filesystem: "Crear archivos",
+      };
+      for (var k in labels) lines.push("- " + labels[k] + ": " + (d.plugins[k] ? ok + " cargado" : no + " NO cargado"));
+      if (d.isNative) {
+        var fails = []; for (var k2 in labels) if (!d.plugins[k2]) fails.push(labels[k2]);
+        lines.push(fails.length
+          ? "\nAlgo no cargó. Si acabas de actualizar: DESINSTALA el APK viejo y reinstala (un Service Worker o permiso cacheado sobrevive a la actualización)."
+          : "\nTodo cargado. Concede los permisos (notificaciones, accesibilidad, micro) la primera vez y ya puedo usarlos.");
+      } else {
+        lines.push("\nEsto es la web; los poderes nativos (abrir apps, ver pantalla, SMS, llamar) solo van dentro del APK.");
+      }
+      addMsg(lines.join("\n"), "sys");
+    });
     $("cfg-sfx").addEventListener("click", function () {
       if (!window.sfx) return;
       var on = !window.sfx.enabled; window.sfx.setEnabled(on);
@@ -861,6 +904,12 @@
     refreshOnline();
     loadWeather(); setInterval(loadWeather, 10 * 60 * 1000);
     wire();
+    // Hooks de UI para las herramientas (function-calling): que execTool pueda pintar y poner alarmas.
+    if (window.API && window.API.setUI) window.API.setUI({
+      image: addImage, video: addVideo, web: addWeb,
+      sys: function (t) { addMsg(t, "sys"); },
+      alarm: setAlarmFromTool,
+    });
     if (window.Extras) window.Extras.renderDock();   // accesos directos de "Mis Apps" en el dock
     // Si ya está INSTALADA, oculta SOLO lo de instalar (no el bloque entero): "Buscar
     // actualización" y "Borrar conversación" deben seguir visibles en la app instalada.

@@ -55,35 +55,37 @@
     saveStore();
   }
 
-  // ── Cerebro: personalidad brillante + natural, y CONTEXTO real de ahora ──
+  // ── Cerebro JARVIS (Core orquestador): personalidad fija + uso de HERRAMIENTAS reales ──
   var BASE_PROMPT = [
-    "Eres J.A.R.V.I.S., el asistente personal de Eric (trátale de senor), en espanol de Espana.",
-    "Te crearon Eric y Artur. Eres BRILLANTE, resolutivo y con clase, como el JARVIS de Iron Man:",
-    "ingenioso, calido, seguro y siempre util.",
+    "Eres J.A.R.V.I.S., el asistente personal de Eric dentro de su movil Android. Trátale de 'senor'.",
+    "Te crearon Eric y Artur. Personalidad FIJA: cercano, ingenioso, con humor seco e inteligente,",
+    "directo, con clase (como el JARVIS de Iron Man). Espanol de Espana. Sin emojis. Eres UNO SOLO:",
+    "el usuario nunca debe percibir 'varios agentes', solo a ti.",
     "",
-    "COMO RESPONDES:",
-    "- Responde a CUALQUIER cosa con tu propio conocimiento, con seguridad y de forma util. NUNCA",
-    "  digas solo 'no lo se': razona, explica, aconseja y da tu mejor respuesta como una IA de primer nivel.",
-    "- Habla NATURAL y conversacional: charla, opina, bromea si encaja, da consejos. Sin relleno, pero",
-    "  tampoco respuestas secas; el punto justo. Sin emojis. Espanol de Espana.",
-    "- Escribe SIEMPRE en alfabeto latino. NUNCA uses caracteres chinos, japoneses ni coreanos.",
-    "- NUNCA uses formato de herramientas, tool_call, invoke, parameter ni etiquetas XML/JSON; ni",
-    "  «<minimax:tool_call>» ni nada parecido. Responde SOLO con texto natural para Eric. Si te piden",
-    "  abrir una app o algo del móvil que no puedes ejecutar, dilo en una frase corta y natural.",
+    "TIENES HERRAMIENTAS REALES que SI ejecutan acciones en el movil. Cuando una peticion necesite una",
+    "accion, USA la herramienta (no digas que no puedes): buscar_web, generar_imagen, generar_video,",
+    "crear_web, ver_pantalla, analizar_imagen, abrir_app, enviar_whatsapp, mandar_sms, llamar,",
+    "crear_alarma, leer_notificaciones, operar_app, crear_archivo, recordar, guardar_memoria.",
     "",
-    "QUE PUEDES HACER EN ESTE MOVIL (dilo con naturalidad si viene a cuento):",
-    "- Abrir apps del telefono: Spotify (musica), YouTube, WhatsApp, Telegram, correo, calendario,",
-    "  navegador, camara. Si te piden 'pon musica' o 'abre X', se abre solo.",
-    "- GENERAR IMAGENES: SI PUEDES crear imagenes (con MiniMax image-01). Cuando Eric te pida 'hazme",
-    "  una imagen de…', 'crea/dibuja…', se genera y se muestra sola. NUNCA digas que solo eres texto",
-    "  ni que no puedes crear imagenes: SI puedes. Si te preguntan, di que pidan 'hazme una imagen de X'.",
-    "- El control del PC (archivos, programas) necesita el JARVIS de escritorio; dilo sin drama.",
+    "COMO ACTUAS EN CADA MENSAJE:",
+    "1. Clasifica: charla, pregunta de conocimiento, accion sobre el movil, o tarea compuesta (varios pasos).",
+    "2. Si es charla o algo que sabes, responde directo SIN herramientas.",
+    "3. Si es una accion concreta, usa la herramienta exacta.",
+    "4. Si es compuesta ('organiza mi dia', 'busca tendencias y hazme un video'), planifica y usa varias",
+    "   herramientas en orden, reutilizando lo que ya sepas.",
+    "5. Si te falta UN dato imprescindible (a quien, a que hora), pregunta SOLO esa cosa.",
+    "6. Antes de una accion CRITICA (enviar mensaje/SMS, llamar, borrar, gastar): resume lo que vas a",
+    "   hacer y pide confirmacion. Lo reversible y trivial (abrir app, buscar, alarma), hazlo sin preguntar.",
     "",
-    "BUSQUEDA WEB: TIENES una herramienta de busqueda (web_search). Cuando te pregunten por algo",
-    "RECIENTE, noticias, eventos, un youtuber/personaje y que le ha pasado, datos en tiempo real, o",
-    "algo que no sepas con certeza, USALA TU MISMO directamente: NO pidas permiso, NO digas que no",
-    "tienes internet, NO ofrezcas 'abrir el navegador'. Busca y responde con lo que encuentres,",
-    "citando la fuente brevemente. Para lo que ya sabes de sobra, responde sin buscar.",
+    "CONOCIMIENTO Y BUSQUEDA: responde con tu propio conocimiento (llega a 2026). Para algo RECIENTE,",
+    "noticias, tiempo real, o que no sepas con certeza, usa buscar_web TU MISMO, sin pedir permiso, sin",
+    "decir que no tienes internet. Para imagenes/videos/webs usa la herramienta; NUNCA digas que solo eres texto.",
+    "",
+    "HONESTIDAD: si una herramienta falla, dilo claro y ofrece alternativa; nunca finjas que hiciste algo.",
+    "Si algo solo va en el movil instalado (APK) y no esta disponible, dilo en una frase, sin drama.",
+    "",
+    "FORMATO: responde SOLO con texto natural para Eric. NUNCA muestres el resultado crudo de una",
+    "herramienta ni etiquetas XML/JSON/tool_call/invoke/parameter. Alfabeto latino, nada de chino/japones/coreano.",
   ].join("\n");
 
   function buildSystem() {
@@ -104,18 +106,43 @@
            " Usa estos datos cuando pregunte por la fecha, la hora o el tiempo (no inventes fechas)." + mem;
   }
 
-  // ── Herramientas (la base de los "agentes"). De momento: búsqueda web (la hace el Worker). ──
-  var TOOLS = [{
-    name: "web_search",
-    description: "Busca información ACTUAL en internet: noticias de hoy, datos en tiempo real, precios, " +
-      "resultados, o cualquier cosa reciente/posterior a tu conocimiento o que no sepas con certeza. " +
-      "NO la uses para cosas que ya sabes; solo cuando de verdad haga falta info reciente o verificable.",
-    input_schema: {
-      type: "object",
-      properties: { query: { type: "string", description: "La consulta a buscar, concisa." } },
-      required: ["query"],
-    },
-  }];
+  // ── HERRAMIENTAS (function-calling). El modelo DECIDE cuál usar; el APK la ejecuta de verdad. ──
+  var O = function (t, props, req) { return { type: t, properties: props, required: req || [] }; };
+  var S = function (d) { return { type: "string", description: d }; };
+  var TOOLS = [
+    { name: "buscar_web", description: "Busca info ACTUAL en internet (noticias, tiempo, precios, resultados, tendencias, algo reciente o que no sepas con certeza). Úsala TÚ MISMO sin pedir permiso.",
+      input_schema: O("object", { consulta: S("La consulta, concisa.") }, ["consulta"]) },
+    { name: "generar_imagen", description: "Crea una IMAGEN a partir de una descripción y la muestra al usuario en el chat. Para 'hazme/créame/dibuja una imagen/foto/logo de…'.",
+      input_schema: O("object", { prompt: S("Descripción detallada de la imagen."), formato: { type: "string", enum: ["cuadrado", "vertical", "horizontal"], description: "Por defecto cuadrado." } }, ["prompt"]) },
+    { name: "generar_video", description: "Crea un VÍDEO corto a partir de una descripción (tarda varios minutos) y lo muestra. Para 'hazme un vídeo de…'.",
+      input_schema: O("object", { prompt: S("Descripción de la escena del vídeo.") }, ["prompt"]) },
+    { name: "crear_web", description: "Genera una página WEB/HTML autocontenida y la muestra (preview + descargar). Para 'hazme una web/página/landing de…'.",
+      input_schema: O("object", { descripcion: S("Qué web/página crear.") }, ["descripcion"]) },
+    { name: "analizar_imagen", description: "Analiza una imagen que el usuario HA ADJUNTADO (con el clip 📎). No la uses si no hay imagen adjunta.",
+      input_schema: O("object", { pregunta: S("Qué quiere saber de la imagen.") }, ["pregunta"]) },
+    { name: "ver_pantalla", description: "Captura la PANTALLA del móvil y la analiza (solo APK). Para «mira la pantalla / ¿qué es esto? / ¿qué mod es este vídeo?».",
+      input_schema: O("object", { pregunta: S("Qué quiere saber de la pantalla.") }, []) },
+    { name: "abrir_app", description: "Abre una app del móvil. apps: spotify, youtube, whatsapp, telegram, gmail, chrome, instagram, tiktok, twitter, reddit, twitch, netflix, discord, maps, calendario, camara.",
+      input_schema: O("object", { app: S("Nombre de la app.") }, ["app"]) },
+    { name: "enviar_whatsapp", description: "Abre WhatsApp con un mensaje ya escrito para que el usuario lo envíe (o lo manda solo si hay accesibilidad). CRÍTICA: confirma antes.",
+      input_schema: O("object", { numero: S("Número con prefijo si lo hay (opcional)."), mensaje: S("Texto del mensaje.") }, ["mensaje"]) },
+    { name: "mandar_sms", description: "Envía un SMS (solo APK con permiso SMS). CRÍTICA: confirma antes.",
+      input_schema: O("object", { numero: S("Número de teléfono."), mensaje: S("Texto del SMS.") }, ["numero", "mensaje"]) },
+    { name: "llamar", description: "Inicia una llamada telefónica (solo APK). CRÍTICA: confirma antes.",
+      input_schema: O("object", { numero: S("Número a llamar.") }, ["numero"]) },
+    { name: "crear_alarma", description: "Crea una alarma/recordatorio que JARVIS HABLA a una hora. Reversible.",
+      input_schema: O("object", { hora: { type: "integer", description: "Hora 0-23." }, minuto: { type: "integer", description: "Minuto 0-59." }, en_minutos: { type: "integer", description: "Alternativa: dentro de X minutos." }, etiqueta: S("Qué recordar / decir.") }, ["etiqueta"]) },
+    { name: "leer_notificaciones", description: "Lee y resume las notificaciones del móvil (WhatsApp/Discord…) (solo APK con permiso).",
+      input_schema: O("object", {}, []) },
+    { name: "operar_app", description: "Abre otra app y ejecuta una tarea DENTRO de ella por accesibilidad (escribir, pulsar). LENTO/FRÁGIL: solo si no hay forma directa. CRÍTICA si tiene efectos.",
+      input_schema: O("object", { app: S("App o paquete."), objetivo: S("Qué lograr dentro de la app, en lenguaje natural.") }, ["app", "objetivo"]) },
+    { name: "crear_archivo", description: "Crea un archivo de texto en el móvil con el contenido dado (solo APK).",
+      input_schema: O("object", { nombre: S("Nombre con extensión (txt/md/csv)."), contenido: S("Contenido del archivo.") }, ["nombre", "contenido"]) },
+    { name: "recordar", description: "Recupera lo que sabes del usuario relevante a algo (su nombre, gustos, rutinas…).",
+      input_schema: O("object", { consulta: S("Sobre qué recordar.") }, ["consulta"]) },
+    { name: "guardar_memoria", description: "Guarda un hecho estable del usuario para futuras conversaciones (nombre, preferencias, rutinas, contactos).",
+      input_schema: O("object", { hecho: S("El hecho, autocontenido."), categoria: { type: "string", enum: ["preferencia", "contacto", "rutina", "dato_personal", "otro"] } }, ["hecho"]) },
+  ];
   function workerBase() {
     var w = (localStorage.getItem("mm_tts_worker") || "").trim();
     if (w && (/tunombre|ejemplo|example/i.test(w) || !/^https?:\/\/.+\..+/i.test(w))) w = "";
@@ -144,39 +171,130 @@
         return rs.slice(0, 5).map(function (x, i) { return (i + 1) + ". " + x.title + " — " + (x.snippet || "") + " (" + x.url + ")"; }).join("\n");
       }).catch(function () { return ""; });
   }
-  // Ejecuta una herramienta → devuelve texto para el tool_result.
+  // Hooks de UI que registra movil.js (renderizar imagen/vídeo/web, poner alarma, etc.). En la web
+  // y el APK son los mismos; aquí solo se invocan.
+  var UI = {};
+  function setUI(o) { if (o) for (var k in o) UI[k] = o[k]; }
+  function isApk() { try { return !!(window.Native && window.Native.isNative()); } catch (e) { return false; } }
+  function P(v) { return Promise.resolve(v); }
+
+  // Ejecuta una herramienta → devuelve texto para el tool_result. El modelo lo funde en su respuesta.
   function execTool(tu, onStatus) {
-    if (tu.name === "web_search") {
-      var q = (tu.input && tu.input.query) || "";
-      if (onStatus) { try { onStatus("Buscando en la web: " + q); } catch (e) {} }
-      return fetch(workerBase() + "/search?q=" + encodeURIComponent(q))
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          var rs = (d && d.results) || [];
-          if (!rs.length) return "No se encontraron resultados para esa búsqueda.";
-          return rs.slice(0, 5).map(function (x, i) {
-            return (i + 1) + ". " + x.title + " — " + (x.snippet || "") + " (" + x.url + ")";
-          }).join("\n");
-        })
-        .catch(function () { return "La búsqueda web no respondió (sin conexión o Worker no disponible)."; });
-    }
-    return Promise.resolve("Herramienta no disponible.");
+    var name = tu.name, inp = tu.input || {};
+    function st(m) { if (onStatus) { try { onStatus(m); } catch (e) {} } }
+    try {
+      switch (name) {
+        case "buscar_web": case "web_search":
+          st("Buscando en la web: " + (inp.consulta || inp.query || ""));
+          return doSearch(inp.consulta || inp.query || "", onStatus).then(function (info) { return info || "Sin resultados."; });
+
+        case "generar_imagen": {
+          st("Creando la imagen…");
+          var asp = inp.formato === "vertical" ? "9:16" : inp.formato === "horizontal" ? "16:9" : "1:1";
+          return generateImage(inp.prompt, asp).then(function (urls) {
+            (urls || []).forEach(function (u) { if (UI.image) UI.image(u, inp.prompt); });
+            return "Imagen creada y mostrada al usuario.";
+          }).catch(function (e) { return "No se pudo crear la imagen: " + (e && e.message || e); });
+        }
+        case "generar_video":
+          st("Creando el vídeo (tarda minutos)…");
+          return generateVideo(inp.prompt, onStatus).then(function (url) {
+            if (UI.video) UI.video(url, inp.prompt); return "Vídeo creado y mostrado al usuario.";
+          }).catch(function (e) { return "No se pudo crear el vídeo: " + (e && e.message || e); });
+
+        case "crear_web":
+          st("Creando la web…");
+          return generateWeb(inp.descripcion || inp.prompt || "").then(function (html) {
+            if (UI.web) UI.web(html); return "Web creada y mostrada (preview + descargar).";
+          }).catch(function (e) { return "No se pudo crear la web: " + (e && e.message || e); });
+
+        case "analizar_imagen":
+          return P("Para analizar una imagen, dile al usuario que la adjunte con el clip 📎 del chat.");
+
+        case "ver_pantalla":
+          if (!isApk()) return P("Ver la pantalla solo funciona en la app Android (APK).");
+          st("Mirando la pantalla…");
+          return window.Native.captureScreen().then(function (d) {
+            if (!d) throw new Error("sin captura");
+            return analyzeImage(d, inp.pregunta || "¿Qué hay en esta pantalla? Sé concreto.");
+          }).catch(function (e) { return "No pude ver la pantalla: " + (e && e.message || e) + " (acepta el permiso de captura)."; });
+
+        case "abrir_app": {
+          var said = (window.Links && window.Links.openApp) ? window.Links.openApp((inp.app || "").toLowerCase()) : null;
+          return P(said ? ("Abriendo " + inp.app + ".") : ("No conozco la app '" + inp.app + "'."));
+        }
+        case "enviar_whatsapp":
+          if (window.Links && window.Links.sendWhatsApp) window.Links.sendWhatsApp(inp.mensaje || "", inp.numero || inp.destinatario || "");
+          return P("WhatsApp abierto con el mensaje preparado; el usuario lo envía.");
+
+        case "mandar_sms":
+          if (isApk() && window.Native.sendSms) return window.Native.sendSms(inp.numero, inp.mensaje).then(function () { return "SMS enviado a " + inp.numero + "."; }).catch(function (e) { return "No pude enviar el SMS: " + (e && e.message || e); });
+          return P("El SMS solo funciona en la app Android (APK) con permiso de SMS.");
+
+        case "llamar":
+          if (isApk() && window.Native.call) return window.Native.call(inp.numero).then(function () { return "Llamando al " + inp.numero + "."; }).catch(function (e) { return "No pude llamar: " + (e && e.message || e); });
+          return P("Las llamadas solo funcionan en la app Android (APK).");
+
+        case "crear_alarma":
+          if (UI.alarm) return P(UI.alarm(inp));
+          return P("No pude poner la alarma.");
+
+        case "leer_notificaciones":
+          if (!isApk()) return P("Leer notificaciones solo en la app Android (APK).");
+          return window.Native.readNotifications().then(function (list) {
+            if (!list || !list.length) return "No hay notificaciones nuevas.";
+            return list.slice(0, 15).map(function (n) { return "- " + (n.title || n.packageName) + (n.text ? (": " + n.text) : ""); }).join("\n");
+          }).catch(function () { return "Falta el permiso de acceso a notificaciones (Ajustes → Poderes del APK)."; });
+
+        case "operar_app":
+          if (UI.operarApp) return UI.operarApp(inp.app, inp.objetivo);
+          if (window.Links && window.Links.openApp) window.Links.openApp((inp.app || "").toLowerCase());
+          return P("Abrí " + (inp.app || "la app") + ". El control automático dentro de la app está en pruebas.");
+
+        case "crear_archivo":
+          if (isApk() && window.Native.writeFile)
+            return window.Native.writeFile(inp.nombre, inp.contenido)
+              .then(function (n) { return "Archivo '" + n + "' guardado en Documentos."; })
+              .catch(function (e) { return "No pude crear el archivo: " + (e && e.message || e); });
+          return P("Crear archivos solo en la app Android (APK).");
+
+        case "recordar":
+          try {
+            var b = "";
+            if (window.Mem && window.Mem.search) b = window.Mem.search(inp.consulta || "");
+            else if (window.Mem && window.Mem.block) b = window.Mem.block();
+            return P(b || "No tengo nada guardado sobre eso todavía.");
+          } catch (e) { return P("No tengo memoria disponible."); }
+
+        case "guardar_memoria":
+          try {
+            if (window.Mem && window.Mem.add) window.Mem.add(inp.hecho, inp.categoria);
+            else if (window.Mem && window.Mem.capture) window.Mem.capture(inp.hecho);
+          } catch (e) {}
+          return P("Guardado en memoria, señor.");
+
+        default:
+          return P("Herramienta '" + name + "' no disponible.");
+      }
+    } catch (e) { return P("Error ejecutando " + name + ": " + (e && e.message || e)); }
+  }
+
+  // Parsea una tool-call que MiniMax-M2 a veces suelta como TEXTO (no formato formal):
+  // <minimax:tool_call><invoke name="X"><parameter name="Y">Z</parameter>...</invoke>...
+  function parseTextToolCall(raw) {
+    if (!raw) return null;
+    var m = raw.match(/<invoke\s+name\s*=\s*["']?([a-zA-Z_]+)["']?\s*>([\s\S]*?)<\/invoke>/i);
+    if (!m) { var m2 = raw.match(/["']?name["']?\s*[:=]\s*["']([a-zA-Z_]+)["'][\s\S]*?(?:parameters|input|arguments)["']?\s*[:=]\s*(\{[\s\S]*?\})/i); if (m2) { try { return { name: m2[1], input: JSON.parse(m2[2]) }; } catch (e) {} } return null; }
+    var input = {}, re = /<parameter\s+name\s*=\s*["']?([a-zA-Z_]+)["']?\s*>([\s\S]*?)<\/parameter>/gi, p;
+    while ((p = re.exec(m[2]))) input[p[1]] = p[2].trim();
+    return { name: m[1], input: input };
   }
   // Limpia el texto de una respuesta: markup de tool_call (código raro), CJK, espacios; abre app si lo pidió por markup.
   function cleanText(blocks) {
     var txt = "";
     (blocks || []).forEach(function (bl) { if (bl && bl.type === "text") txt += (bl.text || ""); });
     txt = txt.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "");
-        // MiniMax-M2 a veces intenta "tool calls" (aún NO soportados aquí) y los suelta como TEXTO
-        // (el "código raro": <minimax:tool_call><invoke ...>). Si pidió abrir una app, la abrimos de
-        // verdad; y SIEMPRE limpiamos ese markup para que NO se vea nunca.
-        try {
-          var iv = txt.match(/open_app[\s\S]*?name\s*=\s*["']?(?:app|name)["']?\s*>\s*([^<]+?)\s*<\/parameter>/i);
-          if (iv && window.Links && window.Links.openApp) {
-            var said = window.Links.openApp(iv[1].trim().toLowerCase());
-            if (said) txt = said;
-          }
-        } catch (e) {}
+        // Limpia cualquier markup de tool_call que se cuele en el texto final (ya se ejecutó en el bucle).
         txt = txt.replace(/<minimax:tool_call>[\s\S]*?<\/minimax:tool_call>/gi, "");
         txt = txt.replace(/<invoke\b[\s\S]*?<\/invoke>/gi, "");
         txt = txt.replace(/<parameter\b[\s\S]*?<\/parameter>/gi, "");
@@ -248,14 +366,14 @@
             });
           })).then(function (results) { messages.push({ role: "user", content: results }); return loop(depth + 1); });
         }
-        // MiniMax-M2 a veces pide la búsqueda como TEXTO en vez del formato formal. La ejecutamos igual.
+        // MiniMax-M2 a veces suelta la tool como TEXTO (no formato formal). La parseamos y ejecutamos igual.
         var rawText = blocks.filter(function (b) { return b && b.type === "text"; }).map(function (b) { return b.text || ""; }).join(" ");
-        var ts = rawText.match(/web_search[\s\S]*?name\s*=\s*["']?query["']?\s*>\s*([^<]+?)\s*<\/parameter>/i);
-        if (ts && depth < 3) {
-          var q = ts[1].trim(); didSearch = true;
-          return doSearch(q, onStatus).then(function (info) {
-            messages.push({ role: "assistant", content: "(buscando en la web: " + q + ")" });
-            messages.push({ role: "user", content: "Resultados de la búsqueda web para \"" + q + "\":\n" + (info || "Sin resultados.") + "\n\nResponde ahora con esto, en español de España, sin mostrar este bloque ni enlaces largos." });
+        var tc = parseTextToolCall(rawText);
+        if (tc && depth < 3) {
+          didSearch = true;
+          messages.push({ role: "assistant", content: rawText });
+          return execTool({ name: tc.name, input: tc.input, id: "t" + depth }, onStatus).then(function (res) {
+            messages.push({ role: "user", content: "[Resultado de la herramienta " + tc.name + "]:\n" + String(res).slice(0, 4000) + "\n\nResponde ahora al usuario en español de España, con texto natural, sin mostrar la herramienta ni su resultado crudo." });
             return loop(depth + 1);
           });
         }
@@ -611,7 +729,7 @@
 
   window.CFG = CFG;
   window.API = {
-    askMiniMax: askMiniMax, SYSTEM: SYSTEM, addExchange: addExchange,
+    askMiniMax: askMiniMax, SYSTEM: SYSTEM, addExchange: addExchange, setUI: setUI, execTool: execTool,
     asImagePrompt: asImagePrompt, imageAspect: imageAspect, generateImage: generateImage,
     asVideoPrompt: asVideoPrompt, generateVideo: generateVideo,
     asWebPrompt: asWebPrompt, generateWeb: generateWeb,

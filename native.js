@@ -37,12 +37,38 @@
   function setText(t) { var p = plugins(); if (!p.Access) return Promise.reject(new Error("no-native")); return p.Access.setText({ text: t }); }
   function clickByText(t) { var p = plugins(); if (!p.Access) return Promise.reject(new Error("no-native")); return p.Access.clickByText({ text: t }); }
   function call(number) { var p = plugins(); if (!p.Call) return Promise.reject(new Error("no-native")); return p.Call.call({ number: number }); }
+  function sendSms(number, message) { var p = plugins(); if (!p.Call) return Promise.reject(new Error("no-native")); return p.Call.sendSms({ number: number, message: message || "" }); }
+  // ── Archivos: crea un .txt/.md/.csv en Documentos (vía @capacitor/filesystem) ──
+  function writeFile(name, content) {
+    try {
+      var FS = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem;
+      if (!FS) return Promise.reject(new Error("no-native"));
+      return FS.writeFile({ path: name, data: String(content == null ? "" : content), directory: "DOCUMENTS", encoding: "utf8", recursive: true })
+        .then(function () { return name; });
+    } catch (e) { return Promise.reject(e); }
+  }
+
+  // ── Diagnóstico: qué plugins han cargado de verdad (para el bloque de Ajustes del APK) ──
+  function diagnose() {
+    var p = plugins();
+    return {
+      isNative: isNative(),
+      plugins: {
+        JarvisOpen: !!p.Open, JarvisNotifications: !!p.Notifs, JarvisScreen: !!p.Screen,
+        JarvisAccessibility: !!p.Access, JarvisCall: !!p.Call,
+        JarvisAlarm: !!(isNative() && window.Capacitor.registerPlugin && reg("JarvisAlarm")),
+        SpeechRecognition: !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SpeechRecognition),
+        Filesystem: !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem),
+      },
+    };
+  }
 
   window.Native = {
-    isNative: isNative, plugins: plugins,
+    isNative: isNative, plugins: plugins, diagnose: diagnose,
     openExternal: openExternal, openPackage: openPackage,
     readNotifications: readNotifications, openNotifSettings: openNotifSettings,
     captureScreen: captureScreen, startMic: startMic, stopMic: stopMic,
-    openAccessibility: openAccessibility, readScreen: readScreen, setText: setText, clickByText: clickByText, call: call,
+    openAccessibility: openAccessibility, readScreen: readScreen, setText: setText, clickByText: clickByText,
+    call: call, sendSms: sendSms, writeFile: writeFile,
   };
 })();
