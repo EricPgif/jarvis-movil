@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "5.5";
-  var WHATS_NEW = "AUTO-ACTUALIZACIÓN: ahora el APK se actualiza SOLO. Al abrir, si hay versión nueva, la descarga e instala por dentro (solo confirmas el «Instalar» de Android; la primera vez te pedirá permitir instalar desde JARVIS). Ya no hay que ir a la web ni desinstalar. Esta actualización (v5.4→v5.5) ya se instala ENCIMA gracias a la firma estable.";
+  var APP_VERSION = "5.6";
+  var WHATS_NEW = "AUTO-ACTUALIZACIÓN: ahora el APK se actualiza SOLO. Al abrir, si hay versión nueva, la descarga e instala por dentro (solo confirmas el «Instalar» de Android; la primera vez te pedirá permitir instalar desde JARVIS). Ya no hay que ir a la web ni desinstalar. Gracias a la firma estable, se instala ENCIMA.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -868,14 +868,17 @@
         .then(function (v) {
           var served = v && v.version;
           if (!served || served === APP_VERSION) return;
+          // Guard en localStorage (NO sessionStorage: en el APK se borra al cerrar la app → el
+          // instalador saltaría en cada arranque). Auto-instala UNA vez por versión nueva; si Eric
+          // la descarta, solo le queda el botón de Ajustes (no insistimos).
           var tried = "";
-          try { tried = sessionStorage.getItem("jv_apk_update") || ""; } catch (e) {}
+          try { tried = localStorage.getItem("jv_apk_update_tried") || ""; } catch (e) {}
           addMsg("🔄 Hay una versión nueva de JARVIS (v" + served + "), señor.", "sys");
-          if (tried === served) {   // ya lo intenté esta sesión → no insistir, solo el botón de Ajustes
+          if (tried === served) {
             addMsg("Si no se instaló, vaya a Ajustes → «🔄 Buscar / instalar actualización».", "sys");
             return;
           }
-          try { sessionStorage.setItem("jv_apk_update", served); } catch (e) {}
+          try { localStorage.setItem("jv_apk_update_tried", served); } catch (e) {}
           doUpdate();   // descarga + lanza el instalador (un toque)
         }).catch(function () {});
     } catch (e) {}
