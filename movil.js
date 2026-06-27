@@ -7,8 +7,8 @@
   var busy = false;
 
   // Versión de la app (subir en cada cambio). Si cambia respecto a la guardada, avisa.
-  var APP_VERSION = "5.4";
-  var WHATS_NEW = "ARREGLADO LO IMPORTANTE: ahora SÍ funcionan abrir apps, llamadas, SMS, leer notificaciones, ver/controlar pantalla y alarmas (un fallo de carga tenía TODOS los plugins bloqueados). Además: FIRMA ESTABLE → a partir de ahora las actualizaciones se instalan ENCIMA, sin desinstalar; y botón «🔄 Buscar / instalar actualización» en Ajustes. OJO: esta vez aún hay que desinstalar el viejo (cambia la firma); desde la próxima, ya no.";
+  var APP_VERSION = "5.5";
+  var WHATS_NEW = "AUTO-ACTUALIZACIÓN: ahora el APK se actualiza SOLO. Al abrir, si hay versión nueva, la descarga e instala por dentro (solo confirmas el «Instalar» de Android; la primera vez te pedirá permitir instalar desde JARVIS). Ya no hay que ir a la web ni desinstalar. Esta actualización (v5.4→v5.5) ya se instala ENCIMA gracias a la firma estable.";
   window.JV_VERSION = APP_VERSION;   // para mostrarla en la intro
 
   // ── UI: mensajes y estado ──
@@ -838,15 +838,29 @@
 
   // ── Actualización del APK (firma estable → se instala ENCIMA, sin desinstalar) ──
   var APK_URL = "https://ericpgif.github.io/jarvis-movil/jarvis.apk";
+  var _updating = false;
   function doUpdate() {
-    addMsg("Descargando la última versión, señor. Cuando acabe la descarga, ÁBRELA e instálala — se instala encima, ya no hay que desinstalar.", "sys");
-    try {
-      if (window.Native && window.Native.isNative() && window.Native.openExternal)
-        window.Native.openExternal(APK_URL).catch(function (e) { addMsg("No pude abrir la descarga, señor: " + (e && e.message || e), "sys"); });
-      else window.open(APK_URL, "_blank");
-    } catch (e) { addMsg("No pude abrir la descarga, señor.", "sys"); }
+    if (_updating) return; _updating = true;
+    // En el APK: descarga el APK nuevo DENTRO de la app y lanza el instalador (un toque). Con la firma
+    // estable se instala ENCIMA. Respaldo: abrir la descarga en el navegador.
+    if (window.Native && window.Native.isNative() && window.Native.installUpdate) {
+      addMsg("Descargando la actualización, señor… al acabar pulse «Instalar» (se instala encima, sin desinstalar). La primera vez, Android le pedirá permitir instalar desde JARVIS.", "sys");
+      window.Native.installUpdate(APK_URL).then(function () {
+        _updating = false;
+      }).catch(function (e) {
+        _updating = false;
+        addMsg("No pude descargar/instalar solo (" + (e && e.message || e) + "), señor. Abro la descarga en el navegador…", "sys");
+        try { if (window.Native.openExternal) window.Native.openExternal(APK_URL); } catch (_) {}
+      });
+      return;
+    }
+    // Web / sin plugin: abrir la descarga.
+    addMsg("Descargando la última versión, señor…", "sys");
+    try { if (window.Native && window.Native.isNative() && window.Native.openExternal) window.Native.openExternal(APK_URL); else window.open(APK_URL, "_blank"); } catch (e) {}
+    _updating = false;
   }
-  // En el APK, al arrancar comprueba si hay una versión más nueva publicada y avisa (no descarga solo).
+  // En el APK, al arrancar: si hay versión nueva publicada → la INSTALA automáticamente (una vez por
+  // sesión; Android pide confirmar el install — es inevitable en apps de fuera de Play Store).
   function checkNativeUpdate() {
     try {
       fetch("https://ericpgif.github.io/jarvis-movil/version.json?_=" + Date.now(), { cache: "no-store" })
@@ -854,7 +868,15 @@
         .then(function (v) {
           var served = v && v.version;
           if (!served || served === APP_VERSION) return;
-          addMsg("🔄 Hay una versión nueva de JARVIS (v" + served + "), señor. Ve a Ajustes → «Buscar / instalar actualización» para ponerla (se instala encima, sin desinstalar).", "sys");
+          var tried = "";
+          try { tried = sessionStorage.getItem("jv_apk_update") || ""; } catch (e) {}
+          addMsg("🔄 Hay una versión nueva de JARVIS (v" + served + "), señor.", "sys");
+          if (tried === served) {   // ya lo intenté esta sesión → no insistir, solo el botón de Ajustes
+            addMsg("Si no se instaló, vaya a Ajustes → «🔄 Buscar / instalar actualización».", "sys");
+            return;
+          }
+          try { sessionStorage.setItem("jv_apk_update", served); } catch (e) {}
+          doUpdate();   // descarga + lanza el instalador (un toque)
         }).catch(function () {});
     } catch (e) {}
   }

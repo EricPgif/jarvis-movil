@@ -29,6 +29,8 @@
   }
   // ── Abrir apps/URLs de forma NATIVA (en el WebView window.location.href no abre apps) ──
   function openExternal(url, fallbackUrl) { var p = plugins(); if (!p.Open) return Promise.reject(new Error("no-native")); return p.Open.openExternal({ url: url, fallbackUrl: fallbackUrl || "" }); }
+  // Descarga el APK nuevo y lanza el instalador de Android (un toque; con firma estable, instala encima).
+  function installUpdate(url) { var p = plugins(); if (!p.Open || !p.Open.installUpdate) return Promise.reject(new Error("no-native")); return p.Open.installUpdate({ url: url }); }
   function openPackage(pkg, fallbackUrl) { var p = plugins(); if (!p.Open) return Promise.reject(new Error("no-native")); return p.Open.open({ package: pkg, fallbackUrl: fallbackUrl || "" }); }
   // ── B4: notificaciones ──
   function readNotifications() {
@@ -77,7 +79,7 @@
 
   window.Native = {
     isNative: isNative, plugins: plugins, diagnose: diagnose,
-    openExternal: openExternal, openPackage: openPackage,
+    openExternal: openExternal, openPackage: openPackage, installUpdate: installUpdate,
     readNotifications: readNotifications, openNotifSettings: openNotifSettings,
     captureScreen: captureScreen, startMic: startMic, stopMic: stopMic,
     openAccessibility: openAccessibility, readScreen: readScreen, setText: setText, clickByText: clickByText,
